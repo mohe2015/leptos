@@ -11,7 +11,7 @@ use reactive_graph::{
     traits::With,
 };
 use send_wrapper::SendWrapper;
-use std::{borrow::Cow, future::Future};
+use std::{borrow::Cow, future::Future, marker::PhantomData};
 use tachys::dom::window;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{Event, HtmlAnchorElement, MouseEvent};
@@ -23,6 +23,35 @@ pub use history::*;
 pub use server::*;
 
 pub(crate) const BASE: &str = "https://leptos.dev";
+
+pub trait UrlContextType {}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct BrowserUrlContext;
+
+impl UrlContextType for BrowserUrlContext {}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct RouterUrlContext;
+
+impl UrlContextType for RouterUrlContext {}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct UrlContext<C: UrlContextType, T>(T, PhantomData<C>);
+
+impl<C: UrlContextType, T> UrlContext<C, T> {
+    pub fn new(value: T) -> Self {
+        Self(value, PhantomData)
+    }
+
+    pub fn map<Q>(&self, mapper: impl Fn(&T) -> Q) -> UrlContext<C, Q> {
+        UrlContext(mapper(&self.0), PhantomData)
+    }
+}
+
+pub type RouterContext<T> = UrlContext<RouterUrlContext, T>;
+
+pub type BrowserContext<T> = UrlContext<BrowserUrlContext, T>;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Url {
@@ -153,25 +182,26 @@ impl Url {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Location {
     /// The path of the URL, not containing the query string or hash fragment.
-    pub pathname: Memo<String>,
+    pub pathname: Memo<RouterContext<String>>,
     /// The raw query string.
-    pub search: Memo<String>,
+    pub search: Memo<RouterContext<String>>,
     /// The query string parsed into its key-value pairs.
-    pub query: Memo<ParamsMap>,
+    pub query: Memo<RouterContext<ParamsMap>>,
     /// The hash fragment.
-    pub hash: Memo<String>,
+    pub hash: Memo<RouterContext<String>>,
     /// The [`state`](https://developer.mozilla.org/en-US/docs/Web/API/History/state) at the top of the history stack.
     pub state: ReadSignal<State>,
 }
 
 impl Location {
     pub(crate) fn new(
-        url: impl Into<ReadSignal<Url>>,
+        url: impl Into<ReadSignal<RouterContext<Url>>>,
         state: impl Into<ReadSignal<State>>,
     ) -> Self {
         let url = url.into();
         let state = state.into();
-        let pathname = Memo::new(move |_| url.with(|url| url.path.clone()));
+        let pathname =
+            Memo::new(move |_| url.with(|url| url.map(|url| url.path.clone())));
         let search = Memo::new(move |_| url.with(|url| url.search.clone()));
         let hash = Memo::new(move |_| url.with(|url| url.hash.clone()));
         let query =
