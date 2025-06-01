@@ -62,9 +62,9 @@ pub struct Url {
     hash: String,
 }
 
-impl Url {
-    pub fn origin(&self) -> &str {
-        &self.origin
+impl<C: UrlContextType> UrlContext<C, Url> {
+    pub fn origin(&self) -> UrlContext<C, &str> {
+        self.map(|u| u.origin.as_str())
     }
 
     pub fn origin_mut(&mut self) -> &mut String {
