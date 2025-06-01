@@ -44,8 +44,18 @@ impl<C: UrlContextType, T> UrlContext<C, T> {
         Self(value, PhantomData)
     }
 
-    pub fn map<Q>(&self, mapper: impl Fn(&T) -> Q) -> UrlContext<C, Q> {
+    pub fn map<'a, Q>(
+        &'a self,
+        mapper: impl Fn(&'a T) -> Q,
+    ) -> UrlContext<C, Q> {
         UrlContext(mapper(&self.0), PhantomData)
+    }
+
+    pub fn map_mut<'a, Q>(
+        &'a mut self,
+        mapper: impl Fn(&'a mut T) -> Q,
+    ) -> UrlContext<C, Q> {
+        UrlContext(mapper(&mut self.0), PhantomData)
     }
 }
 
@@ -67,8 +77,8 @@ impl<C: UrlContextType> UrlContext<C, Url> {
         self.map(|u| u.origin.as_str())
     }
 
-    pub fn origin_mut(&mut self) -> &mut String {
-        &mut self.origin
+    pub fn origin_mut(&mut self) -> UrlContext<C, &mut String> {
+        self.map_mut(|u| &mut u.origin)
     }
 
     pub fn path(&self) -> &str {
