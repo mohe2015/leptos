@@ -202,10 +202,14 @@ impl Location {
         let state = state.into();
         let pathname =
             Memo::new(move |_| url.with(|url| url.map(|url| url.path.clone())));
-        let search = Memo::new(move |_| url.with(|url| url.search.clone()));
-        let hash = Memo::new(move |_| url.with(|url| url.hash.clone()));
-        let query =
-            Memo::new(move |_| url.with(|url| url.search_params.clone()));
+        let search = Memo::new(move |_| {
+            url.with(|url| url.map(|url| url.search.clone()))
+        });
+        let hash =
+            Memo::new(move |_| url.with(|url| url.map(|url| url.hash.clone())));
+        let query = Memo::new(move |_| {
+            url.with(|url| url.map(|url| url.search_params.clone()))
+        });
         Location {
             pathname,
             search,
