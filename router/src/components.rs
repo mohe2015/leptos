@@ -6,7 +6,7 @@ use crate::{
     flat_router::FlatRoutesView,
     hooks::use_navigate,
     location::{
-        BrowserUrl, Location, LocationChange, LocationProvider, State, Url,
+        BrowserRouter, Location, LocationChange, LocationProvider, State, Url,
     },
     navigate::NavigateOptions,
     nested_router::NestedRoutesView,
@@ -84,14 +84,14 @@ where
     let (location_provider, current_url, redirect_hook) = {
         let owner = Owner::current();
         let location =
-            BrowserUrl::new().expect("could not access browser navigation"); // TODO options here
+            BrowserRouter::new().expect("could not access browser navigation"); // TODO options here
         location.init(base.clone());
         provide_context(location.clone());
         let current_url = location.as_url().clone();
 
         let redirect_hook = Box::new(move |loc: &str| {
             if let Some(owner) = &owner {
-                owner.with(|| BrowserUrl::redirect(loc));
+                owner.with(|| BrowserRouter::redirect(loc));
             }
         });
 
@@ -127,7 +127,7 @@ pub(crate) struct RouterContext {
     pub set_is_routing: Option<SignalSetter<bool>>,
     pub query_mutations:
         ArcStoredValue<Vec<(Oco<'static, str>, Option<String>)>>,
-    pub location_provider: Option<BrowserUrl>,
+    pub location_provider: Option<BrowserRouter>,
 }
 
 impl RouterContext {
@@ -144,7 +144,7 @@ impl RouterContext {
             resolve_path("", path, None)
         };
 
-        let mut url = match BrowserUrl::parse(&resolved_to) {
+        let mut url = match BrowserRouter::parse(&resolved_to) {
             Ok(url) => url,
             Err(e) => {
                 leptos::logging::error!("Error parsing URL: {e:?}");
@@ -231,7 +231,7 @@ where
     FallbackFn: FnOnce() -> Fallback + Clone + Send + 'static,
     Fallback: IntoView + 'static,
 {
-    let location = use_context::<BrowserUrl>();
+    let location = use_context::<BrowserRouter>();
     let RouterContext {
         current_url,
         base,
@@ -284,7 +284,7 @@ where
     FallbackFn: FnOnce() -> Fallback + Clone + Send + 'static,
     Fallback: IntoView + 'static,
 {
-    let location = use_context::<BrowserUrl>();
+    let location = use_context::<BrowserRouter>();
     let RouterContext {
         current_url,
         base,

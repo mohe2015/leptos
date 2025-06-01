@@ -1,7 +1,7 @@
 use crate::{
     components::ToHref,
     hooks::{has_router, use_navigate, use_resolved_path},
-    location::{BrowserUrl, LocationProvider},
+    location::{BrowserRouter, LocationProvider},
     NavigateOptions,
 };
 use leptos::{ev, html::form, logging::*, prelude::*, task::spawn_local};
@@ -159,7 +159,9 @@ where
                                 // get returned from a server function
                                 if resp.redirected() {
                                     let resp_url = &resp.url();
-                                    match BrowserUrl::parse(resp_url.as_str()) {
+                                    match BrowserRouter::parse(
+                                        resp_url.as_str(),
+                                    ) {
                                         Ok(url) => {
                                             if url.origin()
                                                 != current_window_origin()
@@ -235,7 +237,9 @@ where
                                 // get returned from a server function
                                 if resp.redirected() {
                                     let resp_url = &resp.url();
-                                    match BrowserUrl::parse(resp_url.as_str()) {
+                                    match BrowserRouter::parse(
+                                        resp_url.as_str(),
+                                    ) {
                                         Ok(url) => {
                                             if url.origin()
                                                 != current_window_origin()
