@@ -135,19 +135,19 @@ pub(crate) struct RouterContext {
 impl RouterContext {
     pub fn navigate(
         &self,
-        path: UrlContext<RouterUrlContext, &str>,
+        path: &UrlContext<RouterUrlContext, &str>,
         options: NavigateOptions,
     ) {
         let current = self.current_url.read_untracked();
         let resolved_to = if options.resolve {
             resolve_path(
-                self.base.map(|base| base.as_deref().unwrap_or_default()),
+                &self.base.map(|base| base.as_deref().unwrap_or_default()),
                 path,
                 // TODO this should be relative to the current *Route*, I think...
-                current.path().map(|path| Some(*path)),
+                &current.path().map(|path| Some(*path)),
             )
         } else {
-            resolve_path(UrlContext::new(""), path, UrlContext::new(None))
+            resolve_path(&UrlContext::new(""), path, &UrlContext::new(None))
         };
 
         let mut url = match BrowserRouter::parse(&resolved_to) {
@@ -578,11 +578,12 @@ pub fn Redirect<P>(
     P: core::fmt::Display + 'static,
 {
     // TODO resolve relative path
-    let path = path.to_string();
+    // TODO here we avoid exposing the urlcontext type to the user
+    let path = UrlContext::<RouterUrlContext, _>::new(path.to_string());
 
     // redirect on the server
     if let Some(redirect_fn) = use_context::<ServerRedirectFunction>() {
-        (redirect_fn.f)(&path);
+        (redirect_fn.f)(&path.map(|path| path.as_str()));
     }
     // redirect on the client
     else {
@@ -601,7 +602,7 @@ pub fn Redirect<P>(
             return;
         }
         let navigate = use_navigate();
-        navigate(&path, options.unwrap_or_default());
+        navigate(&path.map(|path| path.as_str()), options.unwrap_or_default());
     }
 }
 
@@ -610,7 +611,7 @@ pub fn Redirect<P>(
 /// and [`Redirect`].
 #[derive(Clone)]
 pub struct ServerRedirectFunction {
-    f: Arc<dyn Fn(&str) + Send + Sync>,
+    f: Arc<dyn Fn(&UrlContext<RouterUrlContext, &str>) + Send + Sync>,
 }
 
 impl core::fmt::Debug for ServerRedirectFunction {
@@ -622,7 +623,9 @@ impl core::fmt::Debug for ServerRedirectFunction {
 /// Provides a function that can be used to redirect the user to another
 /// absolute path, on the server. This should set a `302` status code and an
 /// appropriate `Location` header.
-pub fn provide_server_redirect(handler: impl Fn(&str) + Send + Sync + 'static) {
+pub fn provide_server_redirect(
+    handler: impl Fn(&UrlContext<RouterUrlContext, &str>) + Send + Sync + 'static,
+) {
     provide_context(ServerRedirectFunction {
         f: Arc::new(handler),
     })

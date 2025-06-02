@@ -181,19 +181,24 @@ where
                                                 let navigate =
                                                     navigate.unwrap();
                                                 navigate(
-                                                    &format!(
-                                                        "{}{}{}",
-                                                        url.path(),
-                                                        if url
-                                                            .search()
-                                                            .is_empty()
-                                                        {
-                                                            ""
-                                                        } else {
-                                                            "?"
-                                                        },
-                                                        url.search(),
-                                                    ),
+                                                    url.path().map(|path| {
+                                                        url.search().map(
+                                                            |search| {
+                                                                &format!(
+                                                                    "{}{}{}",
+                                                                    path,
+                                                                    if search
+                                                                        .is_empty()
+                                                                    {
+                                                                        ""
+                                                                    } else {
+                                                                        "?"
+                                                                    },
+                                                                    search,
+                                                                )
+                                                            },
+                                                        )
+                                                    }),
                                                     navigate_options,
                                                 )
                                             }

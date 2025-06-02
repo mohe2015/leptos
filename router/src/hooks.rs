@@ -1,6 +1,6 @@
 use crate::{
     components::RouterContext,
-    location::{Location, Url},
+    location::{Location, RouterUrlContext, Url, UrlContext},
     navigate::NavigateOptions,
     params::{Params, ParamsError, ParamsMap},
 };
@@ -272,10 +272,12 @@ pub(crate) fn use_resolved_path(
 /// # }
 /// ```
 #[track_caller]
-pub fn use_navigate() -> impl Fn(&str, NavigateOptions) + Clone {
+pub fn use_navigate(
+) -> impl Fn(&UrlContext<RouterUrlContext, &str>, NavigateOptions) + Clone {
     let cx = use_context::<RouterContext>()
         .expect("You cannot call `use_navigate` outside a <Router>.");
-    move |path: &str, options: NavigateOptions| cx.navigate(path, options)
+    move |path: &UrlContext<RouterUrlContext, &str>,
+          options: NavigateOptions| { cx.navigate(path, options) }
 }
 
 /// Returns a reactive string that contains the route that was matched for
