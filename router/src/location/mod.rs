@@ -46,14 +46,14 @@ impl<C: UrlContextType, T> UrlContext<C, T> {
 
     pub fn map<'a, Q>(
         &'a self,
-        mapper: impl Fn(&'a T) -> Q,
+        mut mapper: impl FnMut(&'a T) -> Q,
     ) -> UrlContext<C, Q> {
         UrlContext(mapper(&self.0), PhantomData)
     }
 
     pub fn map_mut<'a, Q>(
         &'a mut self,
-        mapper: impl Fn(&'a mut T) -> Q,
+        mut mapper: impl FnMut(&'a mut T) -> Q,
     ) -> UrlContext<C, Q> {
         UrlContext(mapper(&mut self.0), PhantomData)
     }
@@ -128,65 +128,73 @@ impl<C: UrlContextType> UrlContext<C, Url> {
     }
 
     pub(crate) fn to_full_path(&self) -> UrlContext<C, String> {
-        let mut path = self.path.to_string();
-        if !self.search.is_empty() {
-            path.push('?');
-            path.push_str(&self.search);
-        }
-        if !self.hash.is_empty() {
-            if !self.hash.starts_with('#') {
-                path.push('#');
+        let mut path = self.map(|u| u.path.to_string());
+        self.map(|u| {
+            if !u.search.is_empty() {
+                path.map_mut(|p| p.push('?'));
+                path.map_mut(|p| p.push_str(&u.search));
             }
-            path.push_str(&self.hash);
-        }
+        });
+        self.map(|u| {
+            if !u.hash.is_empty() {
+                if !u.hash.starts_with('#') {
+                    path.map_mut(|p| p.push('#'));
+                }
+                path.map_mut(|p| p.push_str(&u.hash));
+            }
+        });
         path
     }
 
-    pub fn escape(s: &str) -> UrlContext<C, String> {
+    pub fn escape(s: UrlContext<C, &str>) -> UrlContext<C, String> {
         #[cfg(not(feature = "ssr"))]
         {
-            js_sys::encode_uri_component(s).as_string().unwrap()
+            s.map(|s| js_sys::encode_uri_component(s).as_string().unwrap())
         }
         #[cfg(feature = "ssr")]
         {
-            percent_encoding::utf8_percent_encode(
-                s,
-                percent_encoding::NON_ALPHANUMERIC,
-            )
-            .to_string()
-        }
-    }
-
-    pub fn unescape(s: &str) -> UrlContext<C, String> {
-        #[cfg(feature = "ssr")]
-        {
-            percent_encoding::percent_decode_str(s)
-                .decode_utf8()
-                .unwrap()
+            s.map(|s| {
+                percent_encoding::utf8_percent_encode(
+                    s,
+                    percent_encoding::NON_ALPHANUMERIC,
+                )
                 .to_string()
-        }
-
-        #[cfg(not(feature = "ssr"))]
-        {
-            match js_sys::decode_uri_component(s) {
-                Ok(v) => v.into(),
-                Err(_) => s.into(),
-            }
+            })
         }
     }
 
-    pub fn unescape_minimal(s: &str) -> UrlContext<C, String> {
+    pub fn unescape(s: UrlContext<C, &str>) -> UrlContext<C, String> {
+        #[cfg(feature = "ssr")]
+        {
+            s.map(|s| {
+                percent_encoding::percent_decode_str(s)
+                    .decode_utf8()
+                    .unwrap()
+                    .to_string()
+            })
+        }
+
         #[cfg(not(feature = "ssr"))]
         {
-            match js_sys::decode_uri(s) {
+            s.map(|s| match js_sys::decode_uri_component(s) {
                 Ok(v) => v.into(),
-                Err(_) => s.into(),
-            }
+                Err(_) => (*s).into(),
+            })
+        }
+    }
+
+    pub fn unescape_minimal(s: UrlContext<C, &str>) -> UrlContext<C, String> {
+        #[cfg(not(feature = "ssr"))]
+        {
+            s.map(|s| match js_sys::decode_uri(s) {
+                Ok(v) => v.into(),
+                Err(_) => (*s).into(),
+            })
         }
 
         #[cfg(feature = "ssr")]
         {
-            Self::unescape(s)
+            s.map(|s| Self::unescape(s))
         }
     }
 }
