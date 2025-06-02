@@ -6,7 +6,8 @@ use crate::{
     flat_router::FlatRoutesView,
     hooks::use_navigate,
     location::{
-        BrowserRouter, Location, LocationChange, LocationProvider, State, Url,
+        BrowserRouter, Location, LocationChange, LocationProvider,
+        RouterUrlContext, State, Url, UrlContext,
     },
     navigate::NavigateOptions,
     nested_router::NestedRoutesView,
@@ -121,7 +122,7 @@ where
 #[derive(Clone)]
 pub(crate) struct RouterContext {
     pub base: Option<Cow<'static, str>>,
-    pub current_url: ArcRwSignal<Url>,
+    pub current_url: ArcRwSignal<UrlContext<RouterUrlContext, Url>>,
     pub location: Location,
     pub state: ArcRwSignal<State>,
     pub set_is_routing: Option<SignalSetter<bool>>,

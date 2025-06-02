@@ -251,7 +251,7 @@ impl Location {
 #[derive(Debug, Clone, PartialEq)]
 pub struct LocationChange {
     /// The new URL.
-    pub value: String,
+    pub value: UrlContext<RouterUrlContext, std::string::String>,
     /// If true, the new location will replace the current one in the history stack, i.e.,
     /// clicking the "back" button will not return to the current location.
     pub replace: bool,

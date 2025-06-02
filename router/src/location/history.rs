@@ -114,19 +114,24 @@ impl LocationProvider for BrowserRouter {
         // TODO FIXME unwrap
         let location =
             base.map(|base| web_sys::Url::new_with_base(url, base).unwrap());
-        Ok(UrlContext::new(Url {
-            origin: location.origin(),
-            path: location.pathname(),
-            search: location
-                .search()
-                .strip_prefix('?')
-                .map(String::from)
-                .unwrap_or_default(),
-            search_params: search_params_from_web_url(
-                &location.search_params(),
-            )?,
-            hash: location.hash(),
-        }))
+        Ok(location
+            .map(|location| {
+                Url {
+                    origin: location.origin(),
+                    path: location.pathname(),
+                    search: location
+                        .search()
+                        .strip_prefix('?')
+                        .map(String::from)
+                        .unwrap_or_default(),
+                    search_params: search_params_from_web_url(
+                        &location.search_params(),
+                    )
+                    .unwrap(), // TODO FIXME unwrap
+                    hash: location.hash(),
+                }
+            })
+            .change_context())
     }
 
     fn init(&self, base: Option<Cow<'static, str>>) {
