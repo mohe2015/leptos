@@ -1,7 +1,7 @@
 use super::{handle_anchor_click, LocationChange, LocationProvider, Url};
 use crate::{
     hooks::use_navigate,
-    location::{RouterUrlContext, UrlContext},
+    location::{BrowserUrlContext, RouterUrlContext, UrlContext},
     params::ParamsMap,
 };
 use core::fmt;
@@ -101,15 +101,19 @@ impl LocationProvider for BrowserRouter {
     fn parse(
         url: &str,
     ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
-        let base = window().location().origin()?;
-        Self::parse_with_base(url, &base)
+        let base = UrlContext::<BrowserUrlContext, _>::new(
+            window().location().origin()?,
+        );
+        Self::parse_with_base(url, &base.map(|base| base.as_str()))
     }
 
     fn parse_with_base(
         url: &str,
-        base: &str,
+        base: &UrlContext<BrowserUrlContext, &str>,
     ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
-        let location = web_sys::Url::new_with_base(url, base)?;
+        // TODO FIXME unwrap
+        let location =
+            base.map(|base| web_sys::Url::new_with_base(url, base).unwrap());
         Ok(UrlContext::new(Url {
             origin: location.origin(),
             path: location.pathname(),

@@ -22,7 +22,8 @@ use crate::params::ParamsMap;
 pub use history::*;
 pub use server::*;
 
-pub(crate) const BASE: &str = "https://leptos.dev";
+pub(crate) const BASE: UrlContext<BrowserUrlContext, &str> =
+    UrlContext::new("https://leptos.dev");
 
 pub trait UrlContextType {}
 
@@ -40,7 +41,7 @@ impl UrlContextType for RouterUrlContext {}
 pub struct UrlContext<C: UrlContextType, T>(T, PhantomData<C>);
 
 impl<C: UrlContextType, T> UrlContext<C, T> {
-    pub fn new(value: T) -> Self {
+    pub const fn new(value: T) -> Self {
         Self(value, PhantomData)
     }
 
@@ -60,6 +61,10 @@ impl<C: UrlContextType, T> UrlContext<C, T> {
 
     pub fn forget_context(&self) -> &T {
         &self.0
+    }
+
+    pub fn change_context<C2: UrlContextType>(self) -> UrlContext<C2, T> {
+        UrlContext(self.0, PhantomData)
     }
 }
 
@@ -289,12 +294,12 @@ pub trait LocationProvider: Clone + 'static {
     fn parse(
         url: &str,
     ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
-        Self::parse_with_base(url, BASE)
+        Self::parse_with_base(url, &BASE)
     }
 
     fn parse_with_base(
         url: &str,
-        base: &str,
+        base: &UrlContext<BrowserUrlContext, &str>,
     ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error>;
 
     fn redirect(loc: &str);
@@ -339,7 +344,7 @@ pub(crate) fn handle_anchor_click<NavFn, NavFut>(
     router_base: Option<Cow<'static, str>>,
     parse_with_base: fn(
         &str,
-        &str,
+        &UrlContext<BrowserUrlContext, &str>,
     )
         -> Result<UrlContext<RouterUrlContext, Url>, JsValue>,
     navigate: NavFn,
@@ -395,7 +400,11 @@ where
                 return Ok(());
             }
 
-            let url = parse_with_base(href.as_str(), &origin).unwrap();
+            let url = parse_with_base(
+                href.as_str(),
+                &origin.map(|origin| origin.as_str()),
+            )
+            .unwrap();
             let path_name =
                 UrlContext::<RouterUrlContext, Url>::unescape_minimal(
                     url.path(),
@@ -403,7 +412,7 @@ where
 
             // let browser handle this event if it leaves our domain
             // or our base path
-            if url.origin() != origin.map(|o| o.as_str())
+            if url.origin() != origin.map(|o| o.as_str()).change_context()
                 || (!router_base.is_empty()
                     && !path_name.forget_context().is_empty()
                     // NOTE: the two `to_lowercase()` calls here added a total of about 14kb to
