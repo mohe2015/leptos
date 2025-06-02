@@ -25,17 +25,27 @@ pub use server::*;
 pub(crate) const BASE: UrlContext<BrowserUrlContext, &str> =
     UrlContext::new("https://leptos.dev");
 
-pub trait UrlContextType {}
+pub trait UrlContextType {
+    fn produce_from_thin_air() -> Self;
+}
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct BrowserUrlContext;
 
-impl UrlContextType for BrowserUrlContext {}
+impl UrlContextType for BrowserUrlContext {
+    fn produce_from_thin_air() -> Self {
+        Self
+    }
+}
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct RouterUrlContext;
 
-impl UrlContextType for RouterUrlContext {}
+impl UrlContextType for RouterUrlContext {
+    fn produce_from_thin_air() -> Self {
+        Self
+    }
+}
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct UrlContext<C: UrlContextType, T>(T, PhantomData<C>);
@@ -59,11 +69,14 @@ impl<C: UrlContextType, T> UrlContext<C, T> {
         UrlContext(mapper(&mut self.0), PhantomData)
     }
 
-    pub fn forget_context(&self) -> &T {
+    pub fn forget_context(&self, _context: C) -> &T {
         &self.0
     }
 
-    pub fn change_context<C2: UrlContextType>(self) -> UrlContext<C2, T> {
+    pub fn change_context<C2: UrlContextType>(
+        self,
+        _context: C,
+    ) -> UrlContext<C2, T> {
         UrlContext(self.0, PhantomData)
     }
 }
@@ -125,8 +138,12 @@ impl<C: UrlContextType> UrlContext<C, Url> {
     pub fn provide_server_action_error(&self) {
         let search_params = self.search_params();
         if let (Some(err), Some(path)) = (
-            search_params.forget_context().get_str("__err"),
-            search_params.forget_context().get_str("__path"),
+            search_params
+                .forget_context(C::produce_from_thin_air())
+                .get_str("__err"),
+            search_params
+                .forget_context(C::produce_from_thin_air())
+                .get_str("__path"),
         ) {
             provide_context(ServerActionError::new(path, err))
         }
@@ -412,12 +429,13 @@ where
 
             // let browser handle this event if it leaves our domain
             // or our base path
-            if url.origin() != origin.map(|o| o.as_str()).change_context()
+            if url.origin()
+                != origin.map(|o| o.as_str()).change_context(BrowserUrlContext)
                 || (!router_base.is_empty()
-                    && !path_name.forget_context().is_empty()
+                    && !path_name.forget_context(RouterUrlContext).is_empty()
                     // NOTE: the two `to_lowercase()` calls here added a total of about 14kb to
                     // release binary size, for limited gain
-                    && !path_name.forget_context().starts_with(&*router_base))
+                    && !path_name.forget_context(RouterUrlContext).starts_with(&*router_base))
             {
                 return Ok(());
             }
@@ -426,7 +444,7 @@ where
             // default behavior of the click
             ev.prevent_default();
             let to = path_name
-                + if url.search().forget_context().is_empty() {
+                + if url.search().forget_context(RouterUrlContext).is_empty() {
                     ""
                 } else {
                     "?"

@@ -131,7 +131,7 @@ impl LocationProvider for BrowserRouter {
                     hash: location.hash(),
                 }
             })
-            .change_context())
+            .change_context(BrowserUrlContext))
     }
 
     fn init(&self, base: Option<Cow<'static, str>>) {
@@ -245,14 +245,18 @@ impl LocationProvider for BrowserRouter {
                 .replace_state_with_url(
                     &loc.state.to_js_value(),
                     "",
-                    Some(&loc.value),
+                    Some(&loc.value.forget_context(RouterUrlContext)),
                 )
                 .unwrap();
         } else {
             // push the "forward direction" marker
             let state = &loc.state.to_js_value();
             history
-                .push_state_with_url(state, "", Some(&loc.value))
+                .push_state_with_url(
+                    state,
+                    "",
+                    Some(&loc.value.forget_context(RouterUrlContext)),
+                )
                 .unwrap();
         }
 
