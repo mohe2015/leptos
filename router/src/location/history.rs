@@ -134,7 +134,10 @@ impl LocationProvider for BrowserRouter {
             .change_context(BrowserUrlContext))
     }
 
-    fn init(&self, base: Option<Cow<'static, str>>) {
+    fn init(
+        &self,
+        base: UrlContext<RouterUrlContext, Option<Cow<'static, str>>>,
+    ) {
         let window = window();
         let navigate = {
             let url = self.url.clone();

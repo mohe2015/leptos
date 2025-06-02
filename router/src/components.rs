@@ -72,6 +72,7 @@ pub fn Router<Chil>(
 where
     Chil: IntoView,
 {
+    let base = UrlContext::new(base); // don't expose type to end user
     #[cfg(feature = "ssr")]
     let (location_provider, current_url, redirect_hook) = {
         let req = use_context::<RequestUrl>().expect("no RequestUrl provided");
@@ -121,7 +122,7 @@ where
 
 #[derive(Clone)]
 pub(crate) struct RouterContext {
-    pub base: Option<Cow<'static, str>>,
+    pub base: UrlContext<RouterUrlContext, Option<Cow<'static, str>>>,
     pub current_url: ArcRwSignal<UrlContext<RouterUrlContext, Url>>,
     pub location: Location,
     pub state: ArcRwSignal<State>,
@@ -132,17 +133,21 @@ pub(crate) struct RouterContext {
 }
 
 impl RouterContext {
-    pub fn navigate(&self, path: &str, options: NavigateOptions) {
+    pub fn navigate(
+        &self,
+        path: UrlContext<RouterUrlContext, &str>,
+        options: NavigateOptions,
+    ) {
         let current = self.current_url.read_untracked();
         let resolved_to = if options.resolve {
             resolve_path(
-                self.base.as_deref().unwrap_or_default(),
+                self.base.map(|base| base.as_deref().unwrap_or_default()),
                 path,
                 // TODO this should be relative to the current *Route*, I think...
-                Some(current.path()),
+                current.path().map(|path| Some(*path)),
             )
         } else {
-            resolve_path("", path, None)
+            resolve_path(UrlContext::new(""), path, UrlContext::new(None))
         };
 
         let mut url = match BrowserRouter::parse(&resolved_to) {

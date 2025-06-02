@@ -49,7 +49,7 @@ pub(crate) struct FlatRoutesViewState {
     owner: Owner,
     params: ArcRwSignal<ParamsMap>,
     path: String,
-    url: ArcRwSignal<Url>,
+    url: ArcRwSignal<UrlContext<RouterUrlContext, Url>>,
     matched: ArcRwSignal<String>,
 }
 

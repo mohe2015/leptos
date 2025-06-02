@@ -299,7 +299,10 @@ pub trait LocationProvider: Clone + 'static {
     fn current() -> Result<UrlContext<RouterUrlContext, Url>, Self::Error>;
 
     /// Sets up any global event listeners or other initialization needed.
-    fn init(&self, base: Option<Cow<'static, str>>);
+    fn init(
+        &self,
+        base: UrlContext<RouterUrlContext, Option<Cow<'static, str>>>,
+    );
 
     /// Should be called after a navigation when all route components and data have been loaded and
     /// the URL can be updated.
@@ -358,7 +361,7 @@ where
 }
 
 pub(crate) fn handle_anchor_click<NavFn, NavFut>(
-    router_base: Option<Cow<'static, str>>,
+    router_base: UrlContext<RouterUrlContext, Option<Cow<'static, str>>>,
     parse_with_base: fn(
         &str,
         &UrlContext<BrowserUrlContext, &str>,

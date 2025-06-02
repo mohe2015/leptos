@@ -1,9 +1,11 @@
 use std::borrow::Cow;
 
+use crate::location::{RouterUrlContext, UrlContext};
+
 pub fn resolve_path<'a>(
-    base: &'a str,
-    path: &'a str,
-    from: Option<&'a str>,
+    base: UrlContext<RouterUrlContext, &'a str>,
+    path: UrlContext<RouterUrlContext, &'a str>,
+    from: UrlContext<RouterUrlContext, Option<&'a str>>,
 ) -> Cow<'a, str> {
     if has_scheme(path) {
         path.into()

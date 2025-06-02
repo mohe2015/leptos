@@ -1,7 +1,9 @@
 use crate::{
     components::ToHref,
     hooks::{has_router, use_navigate, use_resolved_path},
-    location::{BrowserRouter, LocationProvider},
+    location::{
+        BrowserRouter, BrowserUrlContext, LocationProvider, UrlContext,
+    },
     NavigateOptions,
 };
 use leptos::{ev, html::form, logging::*, prelude::*, task::spawn_local};
@@ -333,18 +335,18 @@ where
     )
 }
 
-fn current_window_origin() -> String {
+fn current_window_origin() -> UrlContext<BrowserUrlContext, String> {
     let location = window().location();
     let protocol = location.protocol().unwrap_or_default();
     let hostname = location.hostname().unwrap_or_default();
     let port = location.port().unwrap_or_default();
-    format!(
+    UrlContext::new(format!(
         "{}//{}{}{}",
         protocol,
         hostname,
         if port.is_empty() { "" } else { ":" },
         port
-    )
+    ))
 }
 
 fn extract_form_attributes(
