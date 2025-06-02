@@ -57,6 +57,10 @@ impl<C: UrlContextType, T> UrlContext<C, T> {
     ) -> UrlContext<C, Q> {
         UrlContext(mapper(&mut self.0), PhantomData)
     }
+
+    pub fn forget_context(&self) -> &T {
+        &self.0
+    }
 }
 
 pub type RouterContext<T> = UrlContext<RouterUrlContext, T>;
@@ -81,49 +85,49 @@ impl<C: UrlContextType> UrlContext<C, Url> {
         self.map_mut(|u| &mut u.origin)
     }
 
-    pub fn path(&self) -> &str {
-        &self.path
+    pub fn path(&self) -> UrlContext<C, &str> {
+        self.map(|u| u.path.as_str())
     }
 
-    pub fn path_mut(&mut self) -> &mut str {
-        &mut self.path
+    pub fn path_mut(&mut self) -> UrlContext<C, &mut str> {
+        self.map_mut(|u| u.path.as_mut_str())
     }
 
-    pub fn search(&self) -> &str {
-        &self.search
+    pub fn search(&self) -> UrlContext<C, &str> {
+        self.map(|u| u.search.as_str())
     }
 
-    pub fn search_mut(&mut self) -> &mut String {
-        &mut self.search
+    pub fn search_mut(&mut self) -> UrlContext<C, &mut String> {
+        self.map_mut(|u| &mut u.search)
     }
 
-    pub fn search_params(&self) -> &ParamsMap {
-        &self.search_params
+    pub fn search_params(&self) -> UrlContext<C, &ParamsMap> {
+        self.map(|u| &u.search_params)
     }
 
-    pub fn search_params_mut(&mut self) -> &mut ParamsMap {
-        &mut self.search_params
+    pub fn search_params_mut(&mut self) -> UrlContext<C, &mut ParamsMap> {
+        self.map_mut(|u| &mut u.search_params)
     }
 
-    pub fn hash(&self) -> &str {
-        &self.hash
+    pub fn hash(&self) -> UrlContext<C, &str> {
+        self.map(|u| u.hash.as_str())
     }
 
-    pub fn hash_mut(&mut self) -> &mut String {
-        &mut self.hash
+    pub fn hash_mut(&mut self) -> UrlContext<C, &mut String> {
+        self.map_mut(|u| &mut u.hash)
     }
 
     pub fn provide_server_action_error(&self) {
         let search_params = self.search_params();
         if let (Some(err), Some(path)) = (
-            search_params.get_str("__err"),
-            search_params.get_str("__path"),
+            search_params.forget_context().get_str("__err"),
+            search_params.forget_context().get_str("__path"),
         ) {
             provide_context(ServerActionError::new(path, err))
         }
     }
 
-    pub(crate) fn to_full_path(&self) -> String {
+    pub(crate) fn to_full_path(&self) -> UrlContext<C, String> {
         let mut path = self.path.to_string();
         if !self.search.is_empty() {
             path.push('?');
@@ -138,7 +142,7 @@ impl<C: UrlContextType> UrlContext<C, Url> {
         path
     }
 
-    pub fn escape(s: &str) -> String {
+    pub fn escape(s: &str) -> UrlContext<C, String> {
         #[cfg(not(feature = "ssr"))]
         {
             js_sys::encode_uri_component(s).as_string().unwrap()
@@ -153,7 +157,7 @@ impl<C: UrlContextType> UrlContext<C, Url> {
         }
     }
 
-    pub fn unescape(s: &str) -> String {
+    pub fn unescape(s: &str) -> UrlContext<C, String> {
         #[cfg(feature = "ssr")]
         {
             percent_encoding::percent_decode_str(s)
@@ -171,7 +175,7 @@ impl<C: UrlContextType> UrlContext<C, Url> {
         }
     }
 
-    pub fn unescape_minimal(s: &str) -> String {
+    pub fn unescape_minimal(s: &str) -> UrlContext<C, String> {
         #[cfg(not(feature = "ssr"))]
         {
             match js_sys::decode_uri(s) {
@@ -260,9 +264,9 @@ pub trait LocationProvider: Clone + 'static {
 
     fn new() -> Result<Self, Self::Error>;
 
-    fn as_url(&self) -> &ArcRwSignal<Url>;
+    fn as_url(&self) -> &ArcRwSignal<UrlContext<RouterUrlContext, Url>>;
 
-    fn current() -> Result<Url, Self::Error>;
+    fn current() -> Result<UrlContext<RouterUrlContext, Url>, Self::Error>;
 
     /// Sets up any global event listeners or other initialization needed.
     fn init(&self, base: Option<Cow<'static, str>>);

@@ -1,5 +1,9 @@
 use super::{handle_anchor_click, LocationChange, LocationProvider, Url};
-use crate::{hooks::use_navigate, params::ParamsMap};
+use crate::{
+    hooks::use_navigate,
+    location::{RouterUrlContext, UrlContext},
+    params::ParamsMap,
+};
 use core::fmt;
 use futures::channel::oneshot;
 use js_sys::{try_iter, Array, JsString};
@@ -21,9 +25,10 @@ use web_sys::{Event, UrlSearchParams};
 
 #[derive(Clone)]
 pub struct BrowserRouter {
-    url: ArcRwSignal<Url>,
+    url: ArcRwSignal<UrlContext<RouterUrlContext, Url>>,
     pub(crate) pending_navigation: Arc<Mutex<Option<oneshot::Sender<()>>>>,
-    pub(crate) path_stack: ArcStoredValue<Vec<Url>>,
+    pub(crate) path_stack:
+        ArcStoredValue<Vec<UrlContext<RouterUrlContext, Url>>>,
     pub(crate) is_back: ArcRwSignal<bool>,
 }
 
@@ -76,7 +81,7 @@ impl LocationProvider for BrowserRouter {
         &self.url
     }
 
-    fn current() -> Result<Url, Self::Error> {
+    fn current() -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
         let location = window().location();
         Ok(Url {
             origin: location.origin()?,
@@ -124,7 +129,7 @@ impl LocationProvider for BrowserRouter {
             move |new_url: Url, loc| {
                 let same_path = {
                     let curr = url.read_untracked();
-                    curr.origin() == new_url.origin()
+                    curr.map(|c| c.origin()) == new_url.origin()
                         && curr.path() == new_url.path()
                 };
 
