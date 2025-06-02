@@ -3,7 +3,7 @@
 use any_spawner::Executor;
 use core::fmt::Debug;
 use js_sys::Reflect;
-use leptos::server::ServerActionError;
+use leptos::{prelude::StorageAccess, server::ServerActionError};
 use reactive_graph::{
     computed::Memo,
     owner::provide_context,
@@ -374,7 +374,8 @@ where
         + 'static,
     NavFut: Future<Output = ()> + 'static,
 {
-    let router_base = router_base.unwrap_or_default();
+    let router_base =
+        router_base.map(|router_base| router_base.unwrap_or_default());
 
     Box::new(move |ev: Event| {
         let ev = ev.unchecked_into::<MouseEvent>();
@@ -434,11 +435,11 @@ where
             // or our base path
             if url.origin()
                 != origin.map(|o| o.as_str()).change_context(BrowserUrlContext)
-                || (!router_base.is_empty()
+                || (!router_base.forget_context(RouterUrlContext).is_empty()
                     && !path_name.forget_context(RouterUrlContext).is_empty()
                     // NOTE: the two `to_lowercase()` calls here added a total of about 14kb to
                     // release binary size, for limited gain
-                    && !path_name.forget_context(RouterUrlContext).starts_with(&*router_base))
+                    && !path_name.forget_context(RouterUrlContext).starts_with(&**router_base.forget_context(RouterUrlContext)))
             {
                 return Ok(());
             }

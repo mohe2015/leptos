@@ -1,4 +1,4 @@
-use crate::location::Url;
+use crate::location::{RouterUrlContext, Url, UrlContext};
 use std::{borrow::Cow, str::FromStr, sync::Arc};
 use thiserror::Error;
 
@@ -26,13 +26,17 @@ impl ParamsMap {
     /// If a value with that key already exists, the new value will be added to it.
     /// To replace the value instead, see [`replace`](Self::replace).
     pub fn insert(&mut self, key: impl Into<Cow<'static, str>>, value: String) {
-        let value = Url::unescape(&value);
+        let value = UrlContext::<RouterUrlContext, Url>::unescape(&value);
 
         let key = key.into();
         if let Some(prev) = self.0.iter_mut().find(|(k, _)| k == &key) {
-            prev.1.push(value);
+            prev.1
+                .push(value.forget_context(RouterUrlContext).to_string());
         } else {
-            self.0.push((key, vec![value]));
+            self.0.push((
+                key,
+                vec![value.forget_context(RouterUrlContext).to_string()],
+            ));
         }
     }
 
@@ -42,14 +46,18 @@ impl ParamsMap {
         key: impl Into<Cow<'static, str>>,
         value: String,
     ) {
-        let value = Url::unescape(&value);
+        let value = UrlContext::<RouterUrlContext, Url>::unescape(&value);
 
         let key = key.into();
         if let Some(prev) = self.0.iter_mut().find(|(k, _)| k == &key) {
             prev.1.clear();
-            prev.1.push(value);
+            prev.1
+                .push(value.forget_context(RouterUrlContext).to_string());
         } else {
-            self.0.push((key, vec![value]));
+            self.0.push((
+                key,
+                vec![value.forget_context(RouterUrlContext).to_string()],
+            ));
         }
     }
 
@@ -94,9 +102,15 @@ impl ParamsMap {
             buf.push('?');
             for (k, vs) in &self.0 {
                 for v in vs {
-                    buf.push_str(&Url::escape(k));
+                    buf.push_str(
+                        &UrlContext::<RouterUrlContext, Url>::escape(k)
+                            .forget_context(RouterUrlContext),
+                    );
                     buf.push('=');
-                    buf.push_str(&Url::escape(v));
+                    buf.push_str(
+                        &UrlContext::<RouterUrlContext, Url>::escape(v)
+                            .forget_context(RouterUrlContext),
+                    );
                     buf.push('&');
                 }
             }
