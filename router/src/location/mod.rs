@@ -286,11 +286,16 @@ pub trait LocationProvider: Clone + 'static {
     /// Update the browser's history to reflect a new location.
     fn complete_navigation(&self, loc: &LocationChange);
 
-    fn parse(url: &str) -> Result<Url, Self::Error> {
+    fn parse(
+        url: &str,
+    ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
         Self::parse_with_base(url, BASE)
     }
 
-    fn parse_with_base(url: &str, base: &str) -> Result<Url, Self::Error>;
+    fn parse_with_base(
+        url: &str,
+        base: &str,
+    ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error>;
 
     fn redirect(loc: &str);
 
@@ -332,11 +337,16 @@ where
 
 pub(crate) fn handle_anchor_click<NavFn, NavFut>(
     router_base: Option<Cow<'static, str>>,
-    parse_with_base: fn(&str, &str) -> Result<Url, JsValue>,
+    parse_with_base: fn(
+        &str,
+        &str,
+    )
+        -> Result<UrlContext<RouterUrlContext, Url>, JsValue>,
     navigate: NavFn,
 ) -> Box<dyn Fn(Event) -> Result<(), JsValue>>
 where
-    NavFn: Fn(Url, LocationChange) -> NavFut + 'static,
+    NavFn: Fn(UrlContext<RouterUrlContext, Url>, LocationChange) -> NavFut
+        + 'static,
     NavFut: Future<Output = ()> + 'static,
 {
     let router_base = router_base.unwrap_or_default();
@@ -384,11 +394,14 @@ where
             }
 
             let url = parse_with_base(href.as_str(), &origin).unwrap();
-            let path_name = Url::unescape_minimal(&url.path);
+            let path_name =
+                UrlContext::<RouterUrlContext, Url>::unescape_minimal(
+                    url.path(),
+                );
 
             // let browser handle this event if it leaves our domain
             // or our base path
-            if url.origin != origin
+            if url.origin() != origin
                 || (!router_base.is_empty()
                     && !path_name.is_empty()
                     // NOTE: the two `to_lowercase()` calls here added a total of about 14kb to
@@ -402,9 +415,13 @@ where
             // default behavior of the click
             ev.prevent_default();
             let to = path_name
-                + if url.search.is_empty() { "" } else { "?" }
-                + &Url::unescape(&url.search)
-                + &Url::unescape(&url.hash);
+                + if url.search().forget_context().is_empty() {
+                    ""
+                } else {
+                    "?"
+                }
+                + &UrlContext::<RouterUrlContext, Url>::unescape(url.search())
+                + &UrlContext::<RouterUrlContext, Url>::unescape(url.hash());
             let state = Reflect::get(&a, &JsValue::from_str("state"))
                 .ok()
                 .and_then(|value| {

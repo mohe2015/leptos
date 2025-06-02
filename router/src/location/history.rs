@@ -77,13 +77,13 @@ impl LocationProvider for BrowserRouter {
         })
     }
 
-    fn as_url(&self) -> &ArcRwSignal<Url> {
+    fn as_url(&self) -> &ArcRwSignal<UrlContext<RouterUrlContext, Url>> {
         &self.url
     }
 
     fn current() -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
         let location = window().location();
-        Ok(Url {
+        Ok(UrlContext::new(Url {
             origin: location.origin()?,
             path: location.pathname()?,
             search: location
@@ -95,17 +95,22 @@ impl LocationProvider for BrowserRouter {
                 &UrlSearchParams::new_with_str(&location.search()?)?,
             )?,
             hash: location.hash()?,
-        })
+        }))
     }
 
-    fn parse(url: &str) -> Result<Url, Self::Error> {
+    fn parse(
+        url: &str,
+    ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
         let base = window().location().origin()?;
         Self::parse_with_base(url, &base)
     }
 
-    fn parse_with_base(url: &str, base: &str) -> Result<Url, Self::Error> {
+    fn parse_with_base(
+        url: &str,
+        base: &str,
+    ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
         let location = web_sys::Url::new_with_base(url, base)?;
-        Ok(Url {
+        Ok(UrlContext::new(Url {
             origin: location.origin(),
             path: location.pathname(),
             search: location
@@ -117,7 +122,7 @@ impl LocationProvider for BrowserRouter {
                 &location.search_params(),
             )?,
             hash: location.hash(),
-        })
+        }))
     }
 
     fn init(&self, base: Option<Cow<'static, str>>) {
@@ -126,10 +131,10 @@ impl LocationProvider for BrowserRouter {
             let url = self.url.clone();
             let pending = Arc::clone(&self.pending_navigation);
             let this = self.clone();
-            move |new_url: Url, loc| {
+            move |new_url: UrlContext<RouterUrlContext, Url>, loc| {
                 let same_path = {
                     let curr = url.read_untracked();
-                    curr.map(|c| c.origin()) == new_url.origin()
+                    curr.origin() == new_url.origin()
                         && curr.path() == new_url.path()
                 };
 
