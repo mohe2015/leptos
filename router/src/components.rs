@@ -91,11 +91,12 @@ where
         provide_context(location.clone());
         let current_url = location.as_url().clone();
 
-        let redirect_hook = Box::new(move |loc: &str| {
-            if let Some(owner) = &owner {
-                owner.with(|| BrowserRouter::redirect(loc));
-            }
-        });
+        let redirect_hook =
+            Box::new(move |loc: &UrlContext<RouterUrlContext, &str>| {
+                if let Some(owner) = &owner {
+                    owner.with(|| BrowserRouter::redirect(loc));
+                }
+            });
 
         (Some(location), current_url, redirect_hook)
     };
@@ -175,7 +176,10 @@ impl RouterContext {
         }
 
         if url.origin() != current.origin() {
-            window().location().set_href(path).unwrap();
+            window()
+                .location()
+                .set_href(path.forget_context(RouterUrlContext))
+                .unwrap();
             return;
         }
 
@@ -203,11 +207,11 @@ impl RouterContext {
 
     pub fn resolve_path<'a>(
         &'a self,
-        path: &'a str,
-        from: Option<&'a str>,
+        path: &UrlContext<RouterUrlContext, &'a str>,
+        from: &UrlContext<RouterUrlContext, Option<&'a str>>,
     ) -> Cow<'a, str> {
-        let base = self.base.as_deref().unwrap_or_default();
-        resolve_path(base, path, from)
+        let base = self.base.map(|base| base.as_deref().unwrap_or_default());
+        resolve_path(&base, path, from)
     }
 }
 
