@@ -353,7 +353,9 @@ where
 
     Box::new(move |ev: Event| {
         let ev = ev.unchecked_into::<MouseEvent>();
-        let origin = window().location().origin()?;
+        let origin = UrlContext::<BrowserUrlContext, _>::new(
+            window().location().origin()?,
+        );
         if ev.default_prevented()
             || ev.button() != 0
             || ev.meta_key()
@@ -401,12 +403,12 @@ where
 
             // let browser handle this event if it leaves our domain
             // or our base path
-            if url.origin() != origin
+            if url.origin() != origin.map(|o| o.as_str())
                 || (!router_base.is_empty()
-                    && !path_name.is_empty()
+                    && !path_name.forget_context().is_empty()
                     // NOTE: the two `to_lowercase()` calls here added a total of about 14kb to
                     // release binary size, for limited gain
-                    && !path_name.starts_with(&*router_base))
+                    && !path_name.forget_context().starts_with(&*router_base))
             {
                 return Ok(());
             }
