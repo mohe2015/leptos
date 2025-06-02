@@ -322,7 +322,7 @@ pub trait LocationProvider: Clone + 'static {
         base: &UrlContext<BrowserUrlContext, &str>,
     ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error>;
 
-    fn redirect(loc: &str);
+    fn redirect(loc: &UrlContext<RouterUrlContext, &str>);
 
     /// Whether we are currently in a "back" navigation.
     fn is_back(&self) -> ReadSignal<bool>;

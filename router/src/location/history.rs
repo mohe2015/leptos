@@ -274,7 +274,7 @@ impl LocationProvider for BrowserRouter {
         Self::scroll_to_el(loc.scroll);
     }
 
-    fn redirect(loc: &str) {
+    fn redirect(loc: &UrlContext<RouterUrlContext, &str>) {
         let navigate = use_navigate();
         let Some(url) = resolve_redirect_url(loc) else {
             return; // resolve_redirect_url() already logs an error
@@ -316,7 +316,9 @@ fn search_params_from_web_url(
 }
 
 /// Resolves a redirect location to an (absolute) URL.
-pub(crate) fn resolve_redirect_url(loc: &str) -> Option<web_sys::Url> {
+pub(crate) fn resolve_redirect_url(
+    loc: &UrlContext<RouterUrlContext, &str>,
+) -> Option<UrlContext<RouterUrlContext, web_sys::Url>> {
     let origin = match window().location().origin() {
         Ok(origin) => origin,
         Err(e) => {
@@ -328,7 +330,7 @@ pub(crate) fn resolve_redirect_url(loc: &str) -> Option<web_sys::Url> {
     // TODO: Use server function's URL as base instead.
     let base = origin;
 
-    match web_sys::Url::new_with_base(loc, &base) {
+    loc.map(|loc| match web_sys::Url::new_with_base(loc, &base) {
         Ok(url) => Some(url),
         Err(e) => {
             leptos::logging::error!(
@@ -337,5 +339,6 @@ pub(crate) fn resolve_redirect_url(loc: &str) -> Option<web_sys::Url> {
             );
             None
         }
-    }
+    })
+    .transpose()
 }
