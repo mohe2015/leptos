@@ -279,15 +279,24 @@ impl LocationProvider for BrowserRouter {
         let Some(url) = resolve_redirect_url(loc) else {
             return; // resolve_redirect_url() already logs an error
         };
-        let current_origin = location().origin().unwrap();
-        if url.origin() == current_origin {
+        let current_origin = UrlContext::<BrowserUrlContext, _>::new(
+            location().origin().unwrap(),
+        );
+        if url.map(|url| url.origin())
+            == current_origin.change_context(BrowserUrlContext)
+        {
             let navigate = navigate.clone();
             // delay by a tick here, so that the Action updates *before* the redirect
             request_animation_frame(move || {
-                navigate(&url.href(), Default::default());
+                navigate(
+                    &url.map(|url| Cow::Owned(url.href())),
+                    Default::default(),
+                );
             });
             // Use set_href() if the conditions for client-side navigation were not satisfied
-        } else if let Err(e) = location().set_href(&url.href()) {
+        } else if let Err(e) =
+            location().set_href(&url.forget_context(RouterUrlContext).href())
+        {
             leptos::logging::error!("Failed to redirect: {e:#?}");
         }
     }

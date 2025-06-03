@@ -136,7 +136,7 @@ pub(crate) struct RouterContext {
 impl RouterContext {
     pub fn navigate(
         &self,
-        path: &UrlContext<RouterUrlContext, &str>,
+        path: &UrlContext<RouterUrlContext, Cow<str>>,
         options: NavigateOptions,
     ) {
         let current = self.current_url.read_untracked();
