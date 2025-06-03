@@ -281,7 +281,7 @@ where
             routes: routes.clone(),
             outer_owner: outer_owner.clone(),
             current_url: current_url.clone(),
-            base: base.as_ref().clone(),
+            base: base.clone(),
             fallback: fallback.clone(),
             set_is_routing,
             transition,
