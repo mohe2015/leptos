@@ -91,12 +91,11 @@ where
         provide_context(location.clone());
         let current_url = location.as_url().clone();
 
-        let redirect_hook =
-            Box::new(move |loc: &UrlContext<RouterUrlContext, &str>| {
-                if let Some(owner) = &owner {
-                    owner.with(|| BrowserRouter::redirect(loc));
-                }
-            });
+        let redirect_hook = Box::new(move |loc: &str| {
+            if let Some(owner) = &owner {
+                owner.with(|| BrowserRouter::redirect(&UrlContext::new(loc)));
+            }
+        });
 
         (Some(location), current_url, redirect_hook)
     };
@@ -136,7 +135,7 @@ pub(crate) struct RouterContext {
 impl RouterContext {
     pub fn navigate(
         &self,
-        path: &UrlContext<RouterUrlContext, Cow<str>>,
+        path: &UrlContext<RouterUrlContext, &str>,
         options: NavigateOptions,
     ) {
         let current = self.current_url.read_untracked();
@@ -163,16 +162,20 @@ impl RouterContext {
         if !query_mutations.is_empty() {
             for (key, value) in query_mutations {
                 if let Some(value) = value {
-                    url.search_params_mut().replace(key, value);
+                    url.search_params_mut().map(|s| s.replace(key, value));
                 } else {
-                    url.search_params_mut().remove(&key);
+                    url.search_params_mut().map(|s| s.remove(&key));
                 }
             }
-            *url.search_mut() = url
-                .search_params()
-                .to_query_string()
-                .trim_start_matches('?')
-                .into()
+            url.search_mut().map(|s| {
+                **s = url
+                    .search_params()
+                    .map_mut(|s| {
+                        s.to_query_string().trim_start_matches('?').to_string()
+                    })
+                    .forget_context(RouterUrlContext)
+                    .clone()
+            });
         }
 
         if url.origin() != current.origin() {

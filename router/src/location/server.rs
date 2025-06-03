@@ -36,7 +36,8 @@ impl RequestUrl {
         &self,
         base: &UrlContext<BrowserUrlContext, &str>,
     ) -> Result<Url, url::ParseError> {
-        let base = url::Url::parse(base.forget_context(BrowserUrlContext))?;
+        let base =
+            url::Url::parse(base.as_ref().forget_context(BrowserUrlContext))?;
         let url = url::Url::options().base_url(Some(&base)).parse(&self.0)?;
 
         let search_params = url

@@ -69,8 +69,12 @@ impl<C: UrlContextType, T> UrlContext<C, T> {
         UrlContext(mapper(&mut self.0), PhantomData)
     }
 
-    pub fn forget_context(&self, _context: C) -> &T {
-        &self.0
+    pub fn as_ref(&self) -> UrlContext<C, &T> {
+        UrlContext(&self.0, PhantomData)
+    }
+
+    pub fn forget_context(self, _context: C) -> T {
+        self.0
     }
 
     pub fn change_context<C2: UrlContextType>(
@@ -139,9 +143,11 @@ impl<C: UrlContextType> UrlContext<C, Url> {
         let search_params = self.search_params();
         if let (Some(err), Some(path)) = (
             search_params
+                .as_ref()
                 .forget_context(C::produce_from_thin_air())
                 .get_str("__err"),
             search_params
+                .as_ref()
                 .forget_context(C::produce_from_thin_air())
                 .get_str("__path"),
         ) {
@@ -439,7 +445,7 @@ where
                     && !path_name.forget_context(RouterUrlContext).is_empty()
                     // NOTE: the two `to_lowercase()` calls here added a total of about 14kb to
                     // release binary size, for limited gain
-                    && !path_name.forget_context(RouterUrlContext).starts_with(&**router_base.forget_context(RouterUrlContext)))
+                    && !path_name.forget_context(RouterUrlContext).starts_with(&*router_base.forget_context(RouterUrlContext)))
             {
                 return Ok(());
             }

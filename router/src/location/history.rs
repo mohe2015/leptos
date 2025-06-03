@@ -248,7 +248,7 @@ impl LocationProvider for BrowserRouter {
                 .replace_state_with_url(
                     &loc.state.to_js_value(),
                     "",
-                    Some(&loc.value.forget_context(RouterUrlContext)),
+                    Some(loc.value.as_ref().forget_context(RouterUrlContext)),
                 )
                 .unwrap();
         } else {
@@ -258,7 +258,7 @@ impl LocationProvider for BrowserRouter {
                 .push_state_with_url(
                     state,
                     "",
-                    Some(&loc.value.forget_context(RouterUrlContext)),
+                    Some(loc.value.as_ref().forget_context(RouterUrlContext)),
                 )
                 .unwrap();
         }
@@ -287,11 +287,9 @@ impl LocationProvider for BrowserRouter {
         {
             let navigate = navigate.clone();
             // delay by a tick here, so that the Action updates *before* the redirect
+            let href = url.map(|url| url.href());
             request_animation_frame(move || {
-                navigate(
-                    &url.map(|url| Cow::Owned(url.href())),
-                    Default::default(),
-                );
+                navigate(&href.map(|href| href.as_str()), Default::default());
             });
             // Use set_href() if the conditions for client-side navigation were not satisfied
         } else if let Err(e) =

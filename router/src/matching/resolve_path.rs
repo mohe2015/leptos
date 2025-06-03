@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::location::{RouterUrlContext, UrlContext};
+use crate::location::{RouterUrlContext, UrlContext, UrlContextType};
 
 pub fn resolve_path<'a>(
     base: &UrlContext<RouterUrlContext, &'a str>,
@@ -46,20 +46,26 @@ fn has_scheme(path: &str) -> bool {
 }
 
 #[doc(hidden)]
-fn normalize(path: &str, omit_slash: bool) -> Cow<'_, str> {
-    let s = path.trim_start_matches('/');
-    let trim_end = s
-        .chars()
-        .rev()
-        .take_while(|c| *c == '/')
-        .count()
-        .saturating_sub(1);
-    let s = &s[0..s.len() - trim_end];
-    if s.is_empty() || omit_slash || begins_with_query_or_hash(s) {
-        s.into()
-    } else {
-        format!("/{s}").into()
-    }
+fn normalize<C: UrlContextType>(
+    path: UrlContext<C, &str>,
+    omit_slash: bool,
+) -> UrlContext<C, Cow<'_, str>> {
+    let s = path.map(|p| p.trim_start_matches('/'));
+    let trim_end = s.map(|s| {
+        s.chars()
+            .rev()
+            .take_while(|c| *c == '/')
+            .count()
+            .saturating_sub(1)
+    });
+    let s = s.map(|s| trim_end.map(|trim_end| &s[0..s.len() - trim_end]));
+    s.map(|s| {
+        if s.is_empty() || omit_slash || begins_with_query_or_hash(s) {
+            s.into()
+        } else {
+            format!("/{s}").into()
+        }
+    })
 }
 
 fn begins_with_query_or_hash(text: &str) -> bool {

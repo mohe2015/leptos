@@ -274,10 +274,10 @@ pub(crate) fn use_resolved_path(
 /// ```
 #[track_caller]
 pub fn use_navigate(
-) -> impl Fn(&UrlContext<RouterUrlContext, Cow<str>>, NavigateOptions) + Clone {
+) -> impl Fn(&UrlContext<RouterUrlContext, &str>, NavigateOptions) + Clone {
     let cx = use_context::<RouterContext>()
         .expect("You cannot call `use_navigate` outside a <Router>.");
-    move |path: &UrlContext<RouterUrlContext, Cow<str>>,
+    move |path: &UrlContext<RouterUrlContext, &str>,
           options: NavigateOptions| { cx.navigate(path, options) }
 }
 
