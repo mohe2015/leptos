@@ -186,7 +186,7 @@ impl RouterContext {
         if url.origin() != current.origin() {
             window()
                 .location()
-                .set_href(path.forget_context(RouterUrlContext))
+                .set_href(path.dupe().forget_context(RouterUrlContext))
                 .unwrap();
             return;
         }
@@ -260,14 +260,14 @@ where
         ..
     } = use_context()
         .expect("<Routes> should be used inside a <Router> component");
-    let base = base.map(|base| {
+    let base = base.as_ref().map(|base| {
         let mut base = Oco::from(base);
         base.upgrade_inplace();
         base
     });
     let routes = RouteDefs::new_with_base(
         children.into_inner(),
-        base.clone().unwrap_or_default(),
+        base.as_ref().clone().map(|v| v.unwrap_or_default()),
     );
     let outer_owner =
         Owner::current().expect("creating Routes, but no Owner was found");
@@ -281,7 +281,7 @@ where
             routes: routes.clone(),
             outer_owner: outer_owner.clone(),
             current_url: current_url.clone(),
-            base: base.clone(),
+            base: base.as_ref().clone(),
             fallback: fallback.clone(),
             set_is_routing,
             transition,
@@ -316,14 +316,14 @@ where
 
     // TODO base
     #[allow(unused)]
-    let base = base.map(|base| {
+    let base = base.as_ref().map(|base| {
         let mut base = Oco::from(base);
         base.upgrade_inplace();
         base
     });
     let routes = RouteDefs::new_with_base(
         children.into_inner(),
-        base.clone().unwrap_or_default(),
+        base.as_ref().clone().map(|v| v.unwrap_or_default()),
     );
 
     let outer_owner =
@@ -598,7 +598,7 @@ pub fn Redirect<P>(
 
     // redirect on the server
     if let Some(redirect_fn) = use_context::<ServerRedirectFunction>() {
-        (redirect_fn.f)(&path.map(|path| path.as_str()));
+        (redirect_fn.f)(&path.as_ref().map(|path| path.as_str()));
     }
     // redirect on the client
     else {
@@ -617,7 +617,10 @@ pub fn Redirect<P>(
             return;
         }
         let navigate = use_navigate();
-        navigate(&path.map(|path| path.as_str()), options.unwrap_or_default());
+        navigate(
+            &path.as_ref().map(|path| path.as_str()),
+            options.unwrap_or_default(),
+        );
     }
 }
 

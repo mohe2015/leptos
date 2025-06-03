@@ -56,6 +56,12 @@ impl<C: UrlContextType, T> UrlContext<C, UrlContext<C, T>> {
     }
 }
 
+impl<C: UrlContextType, T: Copy> UrlContext<C, T> {
+    pub fn dupe(&self) -> UrlContext<C, T> {
+        UrlContext(self.0, PhantomData)
+    }
+}
+
 impl<C: UrlContextType, T> UrlContext<C, T> {
     pub const fn new(value: T) -> Self {
         Self(value, PhantomData)

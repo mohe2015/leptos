@@ -167,6 +167,10 @@ where
                                         Ok(url) => {
                                             if url.origin()
                                                 != current_window_origin()
+                                                    .map(|s| s.as_str())
+                                                    .change_context(
+                                                        BrowserUrlContext,
+                                                    )
                                                 || navigate.is_none()
                                             {
                                                 _ = window()
@@ -181,10 +185,10 @@ where
                                                 let navigate =
                                                     navigate.unwrap();
                                                 navigate(
-                                                    url.path().map(|path| {
+                                                    &url.path().map(|path| {
                                                         url.search().map(
                                                             |search| {
-                                                                &format!(
+                                                                format!(
                                                                     "{}{}{}",
                                                                     path,
                                                                     if search
@@ -195,10 +199,10 @@ where
                                                                         "?"
                                                                     },
                                                                     search,
-                                                                )
+                                                                ).as_str()
                                                             },
                                                         )
-                                                    }),
+                                                    }).flatten(),
                                                     navigate_options,
                                                 )
                                             }
@@ -250,6 +254,10 @@ where
                                         Ok(url) => {
                                             if url.origin()
                                                 != current_window_origin()
+                                                    .map(|v| v.as_str())
+                                                    .change_context(
+                                                        BrowserUrlContext,
+                                                    )
                                                 || navigate.is_none()
                                             {
                                                 _ = window()
@@ -264,19 +272,27 @@ where
                                                 let navigate =
                                                     navigate.unwrap();
                                                 navigate(
-                                                    &format!(
-                                                        "{}{}{}",
-                                                        url.path(),
-                                                        if url
-                                                            .search()
-                                                            .is_empty()
-                                                        {
-                                                            ""
-                                                        } else {
-                                                            "?"
-                                                        },
-                                                        url.search(),
-                                                    ),
+                                                    &url.path()
+                                                        .map(|path| {
+                                                            url.search().map(
+                                                                |search| {
+                                                                    format!(
+                                                                "{}{}{}",
+                                                                path,
+                                                                if search
+                                                                    .is_empty()
+                                                                {
+                                                                    ""
+                                                                } else {
+                                                                    "?"
+                                                                },
+                                                                search,
+                                                            )
+                                                                    .as_str()
+                                                                },
+                                                            )
+                                                        })
+                                                        .flatten(),
                                                     navigate_options,
                                                 )
                                             }
@@ -294,7 +310,9 @@ where
                         params.to_string().as_string().unwrap_or_default();
                     if let Some(navigate) = navigate {
                         navigate(
-                            &format!("{action}?{params}"),
+                            &UrlContext::new(
+                                format!("{action}?{params}").as_str(),
+                            ),
                             navigate_options,
                         );
                     } else {
