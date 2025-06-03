@@ -167,6 +167,7 @@ where
                                         Ok(url) => {
                                             if url.origin()
                                                 != current_window_origin()
+                                                    .as_ref()
                                                     .map(|s| s.as_str())
                                                     .change_context(
                                                         BrowserUrlContext,
@@ -199,10 +200,10 @@ where
                                                                         "?"
                                                                     },
                                                                     search,
-                                                                ).as_str()
+                                                                )
                                                             },
                                                         )
-                                                    }).flatten(),
+                                                    }).flatten().as_ref().map(|v| v.as_str()),
                                                     navigate_options,
                                                 )
                                             }
@@ -254,6 +255,7 @@ where
                                         Ok(url) => {
                                             if url.origin()
                                                 != current_window_origin()
+                                                    .as_ref()
                                                     .map(|v| v.as_str())
                                                     .change_context(
                                                         BrowserUrlContext,
@@ -288,11 +290,12 @@ where
                                                                 },
                                                                 search,
                                                             )
-                                                                    .as_str()
                                                                 },
                                                             )
                                                         })
-                                                        .flatten(),
+                                                        .flatten()
+                                                        .as_ref()
+                                                        .map(|v| v.as_str()),
                                                     navigate_options,
                                                 )
                                             }
