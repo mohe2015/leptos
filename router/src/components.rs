@@ -141,10 +141,13 @@ impl RouterContext {
         let current = self.current_url.read_untracked();
         let resolved_to = if options.resolve {
             resolve_path(
-                &self.base.map(|base| base.as_deref().unwrap_or_default()),
+                &self
+                    .base
+                    .as_ref()
+                    .map(|base| base.as_deref().unwrap_or_default()),
                 path,
                 // TODO this should be relative to the current *Route*, I think...
-                &current.path().map(|path| Some(*path)),
+                &current.path().map(|path| Some(path)),
             )
         } else {
             resolve_path(&UrlContext::new(""), path, &UrlContext::new(None))
@@ -162,19 +165,21 @@ impl RouterContext {
         if !query_mutations.is_empty() {
             for (key, value) in query_mutations {
                 if let Some(value) = value {
-                    url.search_params_mut().map(|s| s.replace(key, value));
+                    url.search_params_mut()
+                        .map(|s| s.replace(key.clone(), value.clone()));
                 } else {
                     url.search_params_mut().map(|s| s.remove(&key));
                 }
             }
-            url.search_mut().map(|s| {
-                **s = url
-                    .search_params()
-                    .map_mut(|s| {
-                        s.to_query_string().trim_start_matches('?').to_string()
-                    })
-                    .forget_context(RouterUrlContext)
-                    .clone()
+            let new_value = url
+                .search_params()
+                .map_mut(|s| {
+                    s.to_query_string().trim_start_matches('?').to_string()
+                })
+                .forget_context(RouterUrlContext)
+                .clone();
+            url.search_mut().map(move |s| {
+                *s = new_value;
             });
         }
 
@@ -213,7 +218,10 @@ impl RouterContext {
         path: &UrlContext<RouterUrlContext, &'a str>,
         from: &UrlContext<RouterUrlContext, Option<&'a str>>,
     ) -> Cow<'a, str> {
-        let base = self.base.map(|base| base.as_deref().unwrap_or_default());
+        let base = self
+            .base
+            .as_ref()
+            .map(|base| base.as_deref().unwrap_or_default());
         resolve_path(&base, path, from)
     }
 }

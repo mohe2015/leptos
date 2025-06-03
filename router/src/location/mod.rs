@@ -62,15 +62,15 @@ impl<C: UrlContextType, T> UrlContext<C, T> {
     }
 
     pub fn map<'a, Q>(
-        &'a self,
-        mut mapper: impl FnMut(&'a T) -> Q,
+        self,
+        mut mapper: impl FnOnce(T) -> Q,
     ) -> UrlContext<C, Q> {
-        UrlContext(mapper(&self.0), PhantomData)
+        UrlContext(mapper(self.0), PhantomData)
     }
 
     pub fn map_mut<'a, Q>(
         &'a mut self,
-        mut mapper: impl FnMut(&'a mut T) -> Q,
+        mut mapper: impl FnOnce(&'a mut T) -> Q,
     ) -> UrlContext<C, Q> {
         UrlContext(mapper(&mut self.0), PhantomData)
     }
