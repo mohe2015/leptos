@@ -58,7 +58,9 @@ fn normalize<C: UrlContextType>(
             .count()
             .saturating_sub(1)
     });
-    let s = s.map(|s| trim_end.map(|trim_end| &s[0..s.len() - trim_end]));
+    let s = s
+        .map(|s| trim_end.map(|trim_end| &s[0..s.len() - trim_end]))
+        .flatten();
     s.map(|s| {
         if s.is_empty() || omit_slash || begins_with_query_or_hash(s) {
             s.into()

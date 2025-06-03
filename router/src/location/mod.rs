@@ -50,6 +50,12 @@ impl UrlContextType for RouterUrlContext {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct UrlContext<C: UrlContextType, T>(T, PhantomData<C>);
 
+impl<C: UrlContextType, T> UrlContext<C, UrlContext<C, T>> {
+    pub fn flatten(self) -> UrlContext<C, T> {
+        UrlContext(self.0 .0, PhantomData)
+    }
+}
+
 impl<C: UrlContextType, T> UrlContext<C, T> {
     pub const fn new(value: T) -> Self {
         Self(value, PhantomData)
