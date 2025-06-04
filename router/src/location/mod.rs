@@ -112,7 +112,7 @@ pub struct Url {
 
 impl<C: UrlContextType> UrlContext<C, Url> {
     pub fn origin(&self) -> UrlContext<C, &str> {
-        self.map(|u| u.origin.as_str())
+        self.as_ref().map(|u| u.origin.as_str())
     }
 
     pub fn origin_mut(&mut self) -> UrlContext<C, &mut String> {
@@ -120,7 +120,7 @@ impl<C: UrlContextType> UrlContext<C, Url> {
     }
 
     pub fn path(&self) -> UrlContext<C, &str> {
-        self.map(|u| u.path.as_str())
+        self.as_ref().map(|u| u.path.as_str())
     }
 
     pub fn path_mut(&mut self) -> UrlContext<C, &mut str> {
@@ -128,7 +128,7 @@ impl<C: UrlContextType> UrlContext<C, Url> {
     }
 
     pub fn search(&self) -> UrlContext<C, &str> {
-        self.map(|u| u.search.as_str())
+        self.as_ref().map(|u| u.search.as_str())
     }
 
     pub fn search_mut(&mut self) -> UrlContext<C, &mut String> {
@@ -136,7 +136,7 @@ impl<C: UrlContextType> UrlContext<C, Url> {
     }
 
     pub fn search_params(&self) -> UrlContext<C, &ParamsMap> {
-        self.map(|u| &u.search_params)
+        self.as_ref().map(|u| &u.search_params)
     }
 
     pub fn search_params_mut(&mut self) -> UrlContext<C, &mut ParamsMap> {
@@ -144,7 +144,7 @@ impl<C: UrlContextType> UrlContext<C, Url> {
     }
 
     pub fn hash(&self) -> UrlContext<C, &str> {
-        self.map(|u| u.hash.as_str())
+        self.as_ref().map(|u| u.hash.as_str())
     }
 
     pub fn hash_mut(&mut self) -> UrlContext<C, &mut String> {
@@ -168,14 +168,14 @@ impl<C: UrlContextType> UrlContext<C, Url> {
     }
 
     pub(crate) fn to_full_path(&self) -> UrlContext<C, String> {
-        let mut path = self.map(|u| u.path.to_string());
-        self.map(|u| {
+        let mut path = self.as_ref().map(|u| u.path.to_string());
+        self.as_ref().map(|u| {
             if !u.search.is_empty() {
                 path.map_mut(|p| p.push('?'));
                 path.map_mut(|p| p.push_str(&u.search));
             }
         });
-        self.map(|u| {
+        self.as_ref().map(|u| {
             if !u.hash.is_empty() {
                 if !u.hash.starts_with('#') {
                     path.map_mut(|p| p.push('#'));
@@ -262,15 +262,17 @@ impl Location {
     ) -> Self {
         let url = url.into();
         let state = state.into();
-        let pathname =
-            Memo::new(move |_| url.with(|url| url.map(|url| url.path.clone())));
-        let search = Memo::new(move |_| {
-            url.with(|url| url.map(|url| url.search.clone()))
+        let pathname = Memo::new(move |_| {
+            url.with(|url| url.as_ref().map(|url| url.path.clone()))
         });
-        let hash =
-            Memo::new(move |_| url.with(|url| url.map(|url| url.hash.clone())));
+        let search = Memo::new(move |_| {
+            url.with(|url| url.as_ref().map(|url| url.search.clone()))
+        });
+        let hash = Memo::new(move |_| {
+            url.with(|url| url.as_ref().map(|url| url.hash.clone()))
+        });
         let query = Memo::new(move |_| {
-            url.with(|url| url.map(|url| url.search_params.clone()))
+            url.with(|url| url.as_ref().map(|url| url.search_params.clone()))
         });
         Location {
             pathname,

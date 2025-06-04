@@ -104,7 +104,7 @@ impl LocationProvider for BrowserRouter {
         let base = UrlContext::<BrowserUrlContext, _>::new(
             window().location().origin()?,
         );
-        Self::parse_with_base(url, &base.map(|base| base.as_str()))
+        Self::parse_with_base(url, &base.as_ref().map(|base| base.as_str()))
     }
 
     fn parse_with_base(
@@ -112,8 +112,9 @@ impl LocationProvider for BrowserRouter {
         base: &UrlContext<BrowserUrlContext, &str>,
     ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
         // TODO FIXME unwrap
-        let location =
-            base.map(|base| web_sys::Url::new_with_base(url, base).unwrap());
+        let location = base
+            .as_ref()
+            .map(|base| web_sys::Url::new_with_base(url, base).unwrap());
         Ok(location
             .map(|location| {
                 Url {
@@ -282,14 +283,17 @@ impl LocationProvider for BrowserRouter {
         let current_origin = UrlContext::<BrowserUrlContext, _>::new(
             location().origin().unwrap(),
         );
-        if url.map(|url| url.origin())
+        if url.as_ref().map(|url| url.origin())
             == current_origin.change_context(BrowserUrlContext)
         {
             let navigate = navigate.clone();
             // delay by a tick here, so that the Action updates *before* the redirect
             let href = url.map(|url| url.href());
             request_animation_frame(move || {
-                navigate(&href.map(|href| href.as_str()), Default::default());
+                navigate(
+                    &href.as_ref().map(|href| href.as_str()),
+                    Default::default(),
+                );
             });
             // Use set_href() if the conditions for client-side navigation were not satisfied
         } else if let Err(e) =

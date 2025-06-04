@@ -9,7 +9,11 @@ pub use path_segment::*;
 mod horizontal;
 mod nested;
 mod vertical;
-use crate::{static_routes::RegenerationFn, Method, SsrMode};
+use crate::{
+    location::{RouterUrlContext, UrlContext},
+    static_routes::RegenerationFn,
+    Method, SsrMode,
+};
 pub use horizontal::*;
 pub use nested::*;
 use std::{borrow::Cow, collections::HashSet, sync::atomic::Ordering};
@@ -17,7 +21,7 @@ pub use vertical::*;
 
 #[derive(Debug)]
 pub struct RouteDefs<Children> {
-    base: Option<Cow<'static, str>>,
+    base: UrlContext<RouterUrlContext, Option<Cow<'static, str>>>,
     children: Children,
 }
 
@@ -36,17 +40,17 @@ where
 impl<Children> RouteDefs<Children> {
     pub fn new(children: Children) -> Self {
         Self {
-            base: None,
+            base: UrlContext::new(None),
             children,
         }
     }
 
     pub fn new_with_base(
         children: Children,
-        base: impl Into<Cow<'static, str>>,
+        base: UrlContext<RouterUrlContext, impl Into<Cow<'static, str>>>,
     ) -> Self {
         Self {
-            base: Some(base.into()),
+            base: base.map(|base| Some(base.into())),
             children,
         }
     }
@@ -57,7 +61,7 @@ where
     Children: MatchNestedRoutes,
 {
     pub fn match_route(&self, path: &str) -> Option<Children::Match> {
-        let path = match &self.base {
+        let path = match self.base.as_ref().forget_context(RouterUrlContext) {
             None => path,
             Some(base) => {
                 let (base, path) = if base.starts_with('/') {
@@ -85,7 +89,14 @@ where
         Option<&str>,
         impl IntoIterator<Item = GeneratedRouteData> + '_,
     ) {
-        (self.base.as_deref(), self.children.generate_routes())
+        // TODO FIXME
+        (
+            self.base
+                .as_ref()
+                .forget_context(RouterUrlContext)
+                .as_deref(),
+            self.children.generate_routes(),
+        )
     }
 }
 
