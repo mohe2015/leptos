@@ -26,7 +26,10 @@ impl ParamsMap {
     /// If a value with that key already exists, the new value will be added to it.
     /// To replace the value instead, see [`replace`](Self::replace).
     pub fn insert(&mut self, key: impl Into<Cow<'static, str>>, value: String) {
-        let value = UrlContext::<RouterUrlContext, Url>::unescape(&value);
+        // TODO FIXME
+        let value = UrlContext::<RouterUrlContext, Url>::unescape(
+            UrlContext::new(&value),
+        );
 
         let key = key.into();
         if let Some(prev) = self.0.iter_mut().find(|(k, _)| k == &key) {
@@ -46,7 +49,10 @@ impl ParamsMap {
         key: impl Into<Cow<'static, str>>,
         value: String,
     ) {
-        let value = UrlContext::<RouterUrlContext, Url>::unescape(&value);
+        // TODO FIXME
+        let value = UrlContext::<RouterUrlContext, Url>::unescape(
+            UrlContext::new(&value),
+        );
 
         let key = key.into();
         if let Some(prev) = self.0.iter_mut().find(|(k, _)| k == &key) {
@@ -102,14 +108,19 @@ impl ParamsMap {
             buf.push('?');
             for (k, vs) in &self.0 {
                 for v in vs {
+                    // TODO FIXME
                     buf.push_str(
-                        &UrlContext::<RouterUrlContext, Url>::escape(k)
-                            .forget_context(RouterUrlContext),
+                        &UrlContext::<RouterUrlContext, Url>::escape(
+                            UrlContext::new(k),
+                        )
+                        .forget_context(RouterUrlContext),
                     );
                     buf.push('=');
                     buf.push_str(
-                        &UrlContext::<RouterUrlContext, Url>::escape(v)
-                            .forget_context(RouterUrlContext),
+                        &UrlContext::<RouterUrlContext, Url>::escape(
+                            UrlContext::new(v),
+                        )
+                        .forget_context(RouterUrlContext),
                     );
                     buf.push('&');
                 }

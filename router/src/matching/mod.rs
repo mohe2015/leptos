@@ -60,12 +60,18 @@ impl<Children> RouteDefs<Children>
 where
     Children: MatchNestedRoutes,
 {
-    pub fn match_route(&self, path: &str) -> Option<Children::Match> {
+    pub fn match_route(
+        &self,
+        path: UrlContext<RouterUrlContext, &str>,
+    ) -> Option<Children::Match> {
         let path = match self.base.as_ref().forget_context(RouterUrlContext) {
             None => path,
             Some(base) => {
                 let (base, path) = if base.starts_with('/') {
-                    (base.trim_start_matches('/'), path.trim_start_matches('/'))
+                    (
+                        base.trim_start_matches('/'),
+                        path.map(|p| p.trim_start_matches('/')),
+                    )
                 } else {
                     (base.as_ref(), path)
                 };

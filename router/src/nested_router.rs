@@ -59,7 +59,7 @@ pub(crate) struct NestedRouteViewState<Fal>
 where
     Fal: Render,
 {
-    path: String,
+    path: UrlContext<RouterUrlContext, String>,
     current_url: ArcRwSignal<UrlContext<RouterUrlContext, Url>>,
     outlets: Vec<RouteContext>,
     // TODO loading fallback
@@ -90,10 +90,11 @@ where
         let mut loaders = Vec::new();
         let mut outlets = Vec::new();
         let url = current_url.read_untracked();
-        let path = url.path().to_string();
+        let path = url.path().map(|u| u.to_string());
 
         // match the route
-        let new_match = routes.match_route(url.path());
+        let new_match =
+            routes.match_route(url.path().forget_context(RouterUrlContext));
 
         // start with an empty view because we'll be loading routes async
         let view = EitherOf3::A(()).build();
@@ -138,17 +139,22 @@ where
 
         // if the path is the same, we do not need to re-route
         // we can just update the search query and go about our day
-        if url_snapshot.path() == state.path {
+        if url_snapshot.path() == state.path.as_ref().map(|p| p.as_str()) {
             for outlet in &state.outlets {
                 outlet.url.set(url_snapshot.to_owned());
             }
             return;
         }
         // since the path didn't match, we'll update the retained path for future diffing
-        state.path.clear();
-        state.path.push_str(url_snapshot.path());
+        state.path.map_mut(|p| p.clear());
+        // TODO FIXME we shouldn't call two map calls like this because this does not ensure that the context is the same
+        url_snapshot.path().map(|url_snapshot| {
+            state.path.map_mut(|p| p.push_str(url_snapshot))
+        });
 
-        let new_match = self.routes.match_route(url_snapshot.path());
+        let new_match = self
+            .routes
+            .match_route(url_snapshot.path().forget_context(RouterUrlContext));
 
         state.current_url.set(url_snapshot);
 
@@ -328,7 +334,9 @@ where
             let current_url = current_url.read_untracked();
 
             let mut outlets = Vec::new();
-            let new_match = routes.match_route(current_url.path());
+            let new_match = routes.match_route(
+                current_url.path().forget_context(RouterUrlContext),
+            );
             let view = match new_match {
                 None => Either::Left(fallback()),
                 Some(route) => {
