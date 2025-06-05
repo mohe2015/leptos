@@ -1,5 +1,6 @@
 #![allow(clippy::type_complexity)]
 use crate::{
+    location::{RouterUrlContext, UrlContext},
     matching::nested::any_nested_match::{AnyNestedMatch, IntoAnyNestedMatch},
     GeneratedRouteData, MatchNestedRoutes, RouteMatchId,
 };
@@ -13,7 +14,7 @@ pub struct AnyNestedRoute {
     match_nested:
         for<'a> fn(
             &'a Erased,
-            &'a str,
+            UrlContext<RouterUrlContext, &'a str>,
         )
             -> (Option<(RouteMatchId, AnyNestedMatch)>, &'a str),
     generate_routes: fn(&Erased) -> Vec<GeneratedRouteData>,
@@ -59,7 +60,7 @@ where
 
         fn match_nested<'a, T: MatchNestedRoutes + Send + Clone + 'static>(
             value: &'a Erased,
-            path: &'a str,
+            path: UrlContext<RouterUrlContext, &'a str>,
         ) -> (Option<(RouteMatchId, AnyNestedMatch)>, &'a str) {
             let (maybe_match, path) = value.get_ref::<T>().match_nested(path);
             (
@@ -97,7 +98,7 @@ impl MatchNestedRoutes for AnyNestedRoute {
 
     fn match_nested<'a>(
         &'a self,
-        path: &'a str,
+        path: UrlContext<RouterUrlContext, &'a str>,
     ) -> (Option<(RouteMatchId, Self::Match)>, &'a str) {
         (self.match_nested)(&self.value, path)
     }

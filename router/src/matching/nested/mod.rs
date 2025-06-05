@@ -2,7 +2,10 @@ use super::{
     IntoChooseViewMaybeErased, MatchInterface, MatchNestedRoutes,
     PartialPathMatch, PathSegment, PossibleRouteMatch, RouteMatchId,
 };
-use crate::{ChooseView, GeneratedRouteData, MatchParams, Method, SsrMode};
+use crate::{
+    location::{RouterUrlContext, UrlContext},
+    ChooseView, GeneratedRouteData, MatchParams, Method, SsrMode,
+};
 use core::{fmt, iter};
 use either_of::Either;
 use std::{
@@ -203,7 +206,7 @@ where
 
     fn match_nested<'a>(
         &'a self,
-        path: &'a str,
+        path: UrlContext<RouterUrlContext, &'a str>,
     ) -> (Option<(RouteMatchId, Self::Match)>, &'a str) {
         // if this was optional (for example, this whole nested route definition consisted of an optional param),
         // then we'll need to retest the inner value against the starting path, if this one succeeds and the inner one fails

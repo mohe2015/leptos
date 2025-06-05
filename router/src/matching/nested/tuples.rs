@@ -1,5 +1,8 @@
 use super::{MatchInterface, MatchNestedRoutes, PathSegment, RouteMatchId};
-use crate::{ChooseView, GeneratedRouteData, MatchParams};
+use crate::{
+    location::{RouterUrlContext, UrlContext},
+    ChooseView, GeneratedRouteData, MatchParams,
+};
 use core::iter;
 use either_of::*;
 use std::borrow::Cow;
@@ -37,7 +40,7 @@ impl MatchNestedRoutes for () {
 
     fn match_nested<'a>(
         &self,
-        path: &'a str,
+        path: UrlContext<RouterUrlContext, &'a str>,
     ) -> (Option<(RouteMatchId, Self::Match)>, &'a str) {
         (Some((RouteMatchId(0), ())), path)
     }
@@ -89,7 +92,7 @@ where
 
     fn match_nested<'a>(
         &'a self,
-        path: &'a str,
+        path: UrlContext<RouterUrlContext, &'a str>,
     ) -> (Option<(RouteMatchId, Self::Match)>, &'a str) {
         self.0.match_nested(path)
     }
@@ -163,7 +166,7 @@ where
 
     fn match_nested<'a>(
         &'a self,
-        path: &'a str,
+        path: UrlContext<RouterUrlContext, &'a str>,
     ) -> (Option<(RouteMatchId, Self::Match)>, &'a str) {
         #[allow(non_snake_case)]
         let (A, B) = &self;
@@ -203,7 +206,7 @@ where
 
     fn match_nested<'a>(
         &'a self,
-        path: &'a str,
+        path: UrlContext<RouterUrlContext, &'a str>,
     ) -> (Option<(RouteMatchId, Self::Match)>, &'a str) {
         for item in self.iter() {
             if let (Some((id, matched)), remaining) = item.match_nested(path) {
@@ -296,14 +299,14 @@ macro_rules! tuples {
                 true
             }
 
-            fn match_nested<'a>(&'a self, path: &'a str) -> (Option<(RouteMatchId, Self::Match)>, &'a str) {
+            fn match_nested<'a>(&'a self, path: UrlContext<RouterUrlContext, &'a str>) -> (Option<(RouteMatchId, Self::Match)>, &'a str) {
                 #[allow(non_snake_case)]
 
                 let ($($ty,)*) = &self;
-                $(if let (Some((_, matched)), remaining) = $ty.match_nested(path) {
+                $(if let (Some((_, matched)), remaining) = $ty.match_nested(path.dupe()) {
                     return (Some((RouteMatchId($count), $either::$ty(matched))), remaining);
                 })*
-                (None, path)
+                (None, path.forget_context(RouterUrlContext))
             }
 
             fn generate_routes(

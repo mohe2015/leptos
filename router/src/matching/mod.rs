@@ -75,7 +75,7 @@ where
                 } else {
                     (base.as_ref(), path)
                 };
-                path.strip_prefix(base)?
+                path.map_opt(|p| p.strip_prefix(base))?
             }
         };
 
@@ -153,7 +153,7 @@ pub trait MatchNestedRoutes {
     /// * 1 - Remaining path
     fn match_nested<'a>(
         &'a self,
-        path: &'a str,
+        path: UrlContext<RouterUrlContext, &'a str>,
     ) -> (Option<(RouteMatchId, Self::Match)>, &'a str);
 
     fn generate_routes(

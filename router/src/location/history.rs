@@ -341,15 +341,15 @@ pub(crate) fn resolve_redirect_url(
     // TODO: Use server function's URL as base instead.
     let base = origin;
 
-    loc.map(|loc| match web_sys::Url::new_with_base(loc, &base) {
-        Ok(url) => Some(url),
-        Err(e) => {
-            leptos::logging::error!(
-                "Invalid redirect location: {}",
-                e.as_string().unwrap_or_default(),
-            );
-            None
-        }
-    })
-    .transpose()
+    loc.as_ref()
+        .map_opt(|loc| match web_sys::Url::new_with_base(loc, &base) {
+            Ok(url) => Some(url),
+            Err(e) => {
+                leptos::logging::error!(
+                    "Invalid redirect location: {}",
+                    e.as_string().unwrap_or_default(),
+                );
+                None
+            }
+        })
 }
