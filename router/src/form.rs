@@ -187,7 +187,7 @@ where
                                                 let navigate =
                                                     navigate.unwrap();
                                                 navigate(
-                                                    &url.path().map(|path| {
+                                                    url.path().map(|path| {
                                                         url.search().map(
                                                             |search| {
                                                                 format!(
@@ -275,7 +275,7 @@ where
                                                 let navigate =
                                                     navigate.unwrap();
                                                 navigate(
-                                                    &url.path()
+                                                    url.path()
                                                         .map(|path| {
                                                             url.search().map(
                                                                 |search| {
@@ -314,7 +314,7 @@ where
                         params.to_string().as_string().unwrap_or_default();
                     if let Some(navigate) = navigate {
                         navigate(
-                            &UrlContext::new(
+                            UrlContext::new(
                                 format!("{action}?{params}").as_str(),
                             ),
                             navigate_options,

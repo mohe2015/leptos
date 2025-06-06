@@ -293,7 +293,7 @@ impl LocationProvider for BrowserRouter {
             let href = url.map(|url| url.href());
             request_animation_frame(move || {
                 navigate(
-                    &href.as_ref().map(|href| href.as_str()),
+                    href.as_ref().map(|href| href.as_str()),
                     Default::default(),
                 );
             });

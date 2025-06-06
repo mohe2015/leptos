@@ -214,14 +214,14 @@ impl RouterContext {
 
     pub fn resolve_path<'a>(
         &'a self,
-        path: &UrlContext<RouterUrlContext, &'a str>,
-        from: &UrlContext<RouterUrlContext, Option<&'a str>>,
-    ) -> Cow<'a, str> {
+        path: UrlContext<RouterUrlContext, &'a str>,
+        from: UrlContext<RouterUrlContext, Option<&'a str>>,
+    ) -> UrlContext<RouterUrlContext, Cow<'a, str>> {
         let base = self
             .base
             .as_ref()
             .map(|base| base.as_deref().unwrap_or_default());
-        resolve_path(&base, path, from)
+        resolve_path(base, path, from)
     }
 }
 

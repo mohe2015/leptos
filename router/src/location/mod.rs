@@ -162,6 +162,60 @@ impl<'a, C: UrlContextType, T1, T2>
     }
 }
 
+impl<'a, C: UrlContextType, T1, T2, T3>
+    UrlContexty<
+        'a,
+        C,
+        (T1, T2, T3),
+        (&'a T1, &'a T2, &'a T3),
+        (&'a mut T1, &'a mut T2, &'a mut T3),
+    > for (UrlContext<C, T1>, UrlContext<C, T2>, UrlContext<C, T3>)
+{
+    fn as_ref(&'a self) -> UrlContext<C, (&'a T1, &'a T2, &'a T3)> {
+        UrlContext((&self.0 .0, &self.1 .0, &self.2 .0), PhantomData)
+    }
+
+    fn as_mut(
+        &'a mut self,
+    ) -> UrlContext<C, (&'a mut T1, &'a mut T2, &'a mut T3)> {
+        UrlContext(
+            (&mut self.0 .0, &mut self.1 .0, &mut self.2 .0),
+            PhantomData,
+        )
+    }
+
+    fn test(self, mapper: impl FnOnce((T1, T2, T3)) -> bool) -> bool {
+        mapper((self.0 .0, self.1 .0, self.2 .0))
+    }
+
+    fn map<Q>(
+        self,
+        mapper: impl FnOnce((T1, T2, T3)) -> Q,
+    ) -> UrlContext<C, Q> {
+        UrlContext(mapper((self.0 .0, self.1 .0, self.2 .0)), PhantomData)
+    }
+
+    fn map_opt<Q>(
+        self,
+        mapper: impl FnOnce((T1, T2, T3)) -> Option<Q>,
+    ) -> Option<UrlContext<C, Q>> {
+        Some(UrlContext(
+            mapper((self.0 .0, self.1 .0, self.2 .0))?,
+            PhantomData,
+        ))
+    }
+
+    fn map_mut<Q>(
+        &'a mut self,
+        mapper: impl FnOnce((&'a mut T1, &'a mut T2, &'a mut T3)) -> Q,
+    ) -> UrlContext<C, Q> {
+        UrlContext(
+            mapper((&mut self.0 .0, &mut self.1 .0, &mut self.2 .0)),
+            PhantomData,
+        )
+    }
+}
+
 pub type RouterContext<T> = UrlContext<RouterUrlContext, T>;
 
 pub type BrowserContext<T> = UrlContext<BrowserUrlContext, T>;

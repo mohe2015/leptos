@@ -12,12 +12,10 @@ use leptos::{
 use reactive_graph::{
     computed::{ArcMemo, Memo},
     owner::{expect_context, use_context},
-    signal::{ArcRwSignal, ReadSignal},
     traits::{Get, GetUntracked, ReadUntracked, With, WriteValue},
     wrappers::write::SignalSetter,
 };
 use std::{
-    borrow::Cow,
     str::FromStr,
     sync::atomic::{AtomicBool, Ordering},
 };
@@ -128,7 +126,11 @@ where
     let set = SignalSetter::map(move |value: Option<T>| {
         let path = location.pathname.get_untracked();
         let hash = location.hash.get_untracked();
-        let qs = location.query.read_untracked().map(|q| q.to_query_string());
+        let qs = location
+            .query
+            .read_untracked()
+            .as_ref()
+            .map(|q| q.to_query_string());
         let new_url = (path, qs, hash)
             .map(|(path, qs, hash)| format!("{path}{qs}{hash}"));
         query_mutations
@@ -141,7 +143,10 @@ where
                 let navigate = navigate.clone();
                 let nav_options = nav_options.clone();
                 move || {
-                    navigate(&new_url, nav_options.clone());
+                    navigate(
+                        new_url.as_ref().map(|u| u.as_str()),
+                        nav_options.clone(),
+                    );
                     IS_NAVIGATING.store(false, Ordering::Relaxed)
                 }
             })
@@ -262,9 +267,12 @@ pub(crate) fn use_resolved_path(
         } else {
             router
                 .resolve_path(
-                    &path,
-                    matched.as_ref().map(|n| n.get()).as_deref(),
+                    UrlContext::new(path.as_str()),
+                    UrlContext::new(
+                        matched.as_ref().map(|n| n.get()).as_deref(),
+                    ),
                 )
+                .forget_context(RouterUrlContext)
                 .to_string()
         }
     })
@@ -283,11 +291,12 @@ pub(crate) fn use_resolved_path(
 /// ```
 #[track_caller]
 pub fn use_navigate(
-) -> impl Fn(&UrlContext<RouterUrlContext, &str>, NavigateOptions) + Clone {
+) -> impl Fn(UrlContext<RouterUrlContext, &str>, NavigateOptions) + Clone {
     let cx = use_context::<RouterContext>()
         .expect("You cannot call `use_navigate` outside a <Router>.");
-    move |path: &UrlContext<RouterUrlContext, &str>,
-          options: NavigateOptions| { cx.navigate(path, options) }
+    move |path: UrlContext<RouterUrlContext, &str>, options: NavigateOptions| {
+        cx.navigate(path, options)
+    }
 }
 
 /// Returns a reactive string that contains the route that was matched for
