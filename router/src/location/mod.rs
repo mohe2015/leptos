@@ -65,7 +65,7 @@ impl<C: UrlContextType, T> UrlContext<C, T> {
         UrlContext(mapper(self.0), PhantomData)
     }
 
-    pub fn check(self, mapper: impl FnOnce(T) -> bool) -> bool {
+    pub fn test(self, mapper: impl FnOnce(T) -> bool) -> bool {
         mapper(self.0)
     }
 
@@ -96,6 +96,18 @@ impl<C: UrlContextType, T> UrlContext<C, T> {
         _context: C,
     ) -> UrlContext<C2, T> {
         UrlContext(self.0, PhantomData)
+    }
+}
+
+trait UrlContexty<T> {
+    fn test(self, mapper: impl FnOnce(T) -> bool) -> bool;
+}
+
+impl<C: UrlContextType, T1, T2> UrlContexty<(T1, T2)>
+    for (UrlContext<C, T1>, UrlContext<C, T2>)
+{
+    fn test(self, mapper: impl FnOnce((T1, T2)) -> bool) -> bool {
+        mapper((self.0 .0, self.1 .0))
     }
 }
 
