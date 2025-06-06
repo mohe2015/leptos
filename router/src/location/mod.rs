@@ -61,11 +61,12 @@ impl<C: UrlContextType, T> UrlContext<C, T> {
         Self(value, PhantomData)
     }
 
-    pub fn map<'a, Q>(
-        self,
-        mut mapper: impl FnOnce(T) -> Q,
-    ) -> UrlContext<C, Q> {
+    pub fn map<Q>(self, mapper: impl FnOnce(T) -> Q) -> UrlContext<C, Q> {
         UrlContext(mapper(self.0), PhantomData)
+    }
+
+    pub fn check(self, mapper: impl FnOnce(T) -> bool) -> bool {
+        mapper(self.0)
     }
 
     pub fn map_opt<'a, Q>(

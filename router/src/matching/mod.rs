@@ -82,7 +82,7 @@ where
         let (matched, remaining) = self.children.match_nested(path);
         let matched = matched?;
 
-        if !(remaining.is_empty() || remaining == "/") {
+        if !remaining.check(|r| r.is_empty() || r == "/") {
             None
         } else {
             Some(matched.1)
