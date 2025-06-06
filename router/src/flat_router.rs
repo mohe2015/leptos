@@ -1,6 +1,8 @@
 use crate::{
     hooks::Matched,
-    location::{LocationProvider, RouterUrlContext, Url, UrlContext},
+    location::{
+        LocationProvider, RouterUrlContext, Url, UrlContext, UrlContexty as _,
+    },
     matching::{MatchParams, RouteDefs},
     params::ParamsMap,
     view_transition::start_view_transition,
@@ -108,7 +110,7 @@ where
         // these will be held in state so that future navigations can update or replace them
         let owner = outer_owner.child();
         let url = ArcRwSignal::new(current_url.to_owned());
-        let path = current_url.path().to_string();
+        let path = current_url.path().map(|path| path.to_string());
         let params = ArcRwSignal::new(
             new_match
                 .as_ref()
@@ -126,7 +128,7 @@ where
                 id,
                 owner,
                 params,
-                path,
+                path: path.forget_context(RouterUrlContext),
                 url,
                 matched,
             })),
@@ -159,7 +161,7 @@ where
                         id,
                         owner,
                         params,
-                        path,
+                        path: path.forget_context(RouterUrlContext),
                         url,
                         matched,
                     })),
@@ -170,7 +172,7 @@ where
                                 id,
                                 owner,
                                 params,
-                                path,
+                                path: path.forget_context(RouterUrlContext),
                                 url,
                                 matched,
                             }));
@@ -206,7 +208,7 @@ where
         // if the path is the same, we do not need to re-route
         // we can just update the search query and go about our day
         let mut initial_state = state.borrow_mut();
-        if url_snapshot.path() == initial_state.path {
+        if url_snapshot.path().test(|path| path == initial_state.path) {
             initial_state.url.set(url_snapshot.to_owned());
             if let Some(location) = location {
                 location.ready_to_complete();
@@ -216,7 +218,9 @@ where
 
         // since the path didn't match, we'll update the retained path for future diffing
         initial_state.path.clear();
-        initial_state.path.push_str(url_snapshot.path());
+        url_snapshot
+            .path()
+            .map(|path| initial_state.path.push_str(path));
 
         // otherwise, match the new route
         let new_match = routes.match_route(url_snapshot.path());
@@ -285,7 +289,8 @@ where
                     );
                 }
 
-                let spawned_path = url_snapshot.path().to_string();
+                let spawned_path =
+                    url_snapshot.path().map(|path| path.to_string());
 
                 let is_back = location
                     .as_ref()
@@ -316,7 +321,7 @@ where
                             // only update the route if it's still the current path
                             // i.e., if we've navigated away before this has loaded, do nothing
                             if current_url.read_untracked().path()
-                                == spawned_path
+                                == spawned_path.as_ref().map(|p| p.as_str())
                             {
                                 let rebuild = move || {
                                     view.into_any()
@@ -666,7 +671,7 @@ where
         // these will be held in state so that future navigations can update or replace them
         let owner = outer_owner.child();
         let url = ArcRwSignal::new(current_url.to_owned());
-        let path = current_url.path().to_string();
+        let path = current_url.path().map(|p| p.to_string());
         let params = ArcRwSignal::new(
             new_match
                 .as_ref()
@@ -686,7 +691,7 @@ where
                 id,
                 owner,
                 params,
-                path,
+                path: path.forget_context(RouterUrlContext),
                 url,
                 matched,
             })),
@@ -721,7 +726,7 @@ where
                         id,
                         owner,
                         params,
-                        path,
+                        path: path.forget_context(RouterUrlContext),
                         url,
                         matched,
                     })),
