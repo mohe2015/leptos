@@ -61,10 +61,6 @@ impl<C: UrlContextType, T> UrlContext<C, T> {
         Self(value, PhantomData)
     }
 
-    pub fn as_ref(&self) -> UrlContext<C, &T> {
-        UrlContext(&self.0, PhantomData)
-    }
-
     pub fn forget_context(self, _context: C) -> T {
         self.0
     }
@@ -78,7 +74,9 @@ impl<C: UrlContextType, T> UrlContext<C, T> {
 }
 
 pub trait UrlContexty<'a, C: UrlContextType, T, RefT, MutT> {
-    fn test(&'a self, mapper: impl FnOnce(RefT) -> bool) -> bool;
+    fn as_ref(&'a self) -> UrlContext<C, RefT>;
+
+    fn test(self, mapper: impl FnOnce(T) -> bool) -> bool;
 
     fn map<Q>(self, mapper: impl FnOnce(T) -> Q) -> UrlContext<C, Q>;
 
@@ -96,8 +94,12 @@ pub trait UrlContexty<'a, C: UrlContextType, T, RefT, MutT> {
 impl<'a, C: UrlContextType, T1> UrlContexty<'a, C, T1, &'a T1, &'a mut T1>
     for UrlContext<C, T1>
 {
-    fn test(&'a self, mapper: impl FnOnce(&'a T1) -> bool) -> bool {
-        mapper(&self.0)
+    fn as_ref(&'a self) -> UrlContext<C, &'a T1> {
+        UrlContext(&self.0, PhantomData)
+    }
+
+    fn test(self, mapper: impl FnOnce(T1) -> bool) -> bool {
+        mapper(self.0)
     }
 
     fn map<Q>(self, mapper: impl FnOnce(T1) -> Q) -> UrlContext<C, Q> {
@@ -123,8 +125,12 @@ impl<'a, C: UrlContextType, T1, T2>
     UrlContexty<'a, C, (T1, T2), (&'a T1, &'a T2), (&'a mut T1, &'a mut T2)>
     for (UrlContext<C, T1>, UrlContext<C, T2>)
 {
-    fn test(&'a self, mapper: impl FnOnce((&'a T1, &'a T2)) -> bool) -> bool {
-        mapper((&self.0 .0, &self.1 .0))
+    fn as_ref(&'a self) -> UrlContext<C, (&'a T1, &'a T2)> {
+        UrlContext((&self.0 .0, &self.1 .0), PhantomData)
+    }
+
+    fn test(self, mapper: impl FnOnce((T1, T2)) -> bool) -> bool {
+        mapper((self.0 .0, self.1 .0))
     }
 
     fn map<Q>(self, mapper: impl FnOnce((T1, T2)) -> Q) -> UrlContext<C, Q> {
@@ -511,7 +517,7 @@ where
                     && !path_name.test(|path_name| path_name.is_empty())
                     // NOTE: the two `to_lowercase()` calls here added a total of about 14kb to
                     // release binary size, for limited gain
-                    && !path_name.test(|path_name| path_name.starts_with(&**&*router_base.as_ref().forget_context(RouterUrlContext))))
+                    && !path_name.test(|path_name| path_name.starts_with(&**router_base.as_ref().forget_context(RouterUrlContext))))
             {
                 return Ok(());
             }
