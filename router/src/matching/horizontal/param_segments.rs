@@ -1,3 +1,5 @@
+use crate::location::{RouterUrlContext, UrlContext};
+
 use super::{PartialPathMatch, PathSegment, PossibleRouteMatch};
 use core::iter;
 use std::borrow::Cow;
@@ -39,7 +41,10 @@ impl PossibleRouteMatch for ParamSegment {
         false
     }
 
-    fn test<'a>(&self, path: &'a str) -> Option<PartialPathMatch<'a>> {
+    fn test<'a>(
+        &self,
+        path: UrlContext<RouterUrlContext, &'a str>,
+    ) -> Option<PartialPathMatch<'a>> {
         let mut matched_len = 0;
         let mut param_offset = 0;
         let mut param_len = 0;
@@ -129,7 +134,10 @@ impl PossibleRouteMatch for WildcardSegment {
         false
     }
 
-    fn test<'a>(&self, path: &'a str) -> Option<PartialPathMatch<'a>> {
+    fn test<'a>(
+        &self,
+        path: UrlContext<RouterUrlContext, &'a str>,
+    ) -> Option<PartialPathMatch<'a>> {
         let mut matched_len = 0;
         let mut param_offset = 0;
         let mut param_len = 0;
@@ -170,7 +178,10 @@ impl PossibleRouteMatch for OptionalParamSegment {
         true
     }
 
-    fn test<'a>(&self, path: &'a str) -> Option<PartialPathMatch<'a>> {
+    fn test<'a>(
+        &self,
+        path: UrlContext<RouterUrlContext, &'a str>,
+    ) -> Option<PartialPathMatch<'a>> {
         let mut matched_len = 0;
         let mut param_offset = 0;
         let mut param_len = 0;

@@ -45,7 +45,10 @@ impl PossibleRouteMatch for Box<dyn PossibleRouteMatch + Send + Sync> {
         (**self).optional()
     }
 
-    fn test<'a>(&self, path: &'a str) -> Option<PartialPathMatch<'a>> {
+    fn test<'a>(
+        &self,
+        path: UrlContext<RouterUrlContext, &'a str>,
+    ) -> Option<PartialPathMatch<'a>> {
         (**self).test(path)
     }
 
@@ -59,7 +62,10 @@ impl PossibleRouteMatch for Arc<dyn PossibleRouteMatch + Send + Sync> {
         (**self).optional()
     }
 
-    fn test<'a>(&self, path: &'a str) -> Option<PartialPathMatch<'a>> {
+    fn test<'a>(
+        &self,
+        path: UrlContext<RouterUrlContext, &'a str>,
+    ) -> Option<PartialPathMatch<'a>> {
         (**self).test(path)
     }
 

@@ -1,3 +1,5 @@
+use crate::location::{RouterUrlContext, UrlContext};
+
 use super::{PartialPathMatch, PathSegment, PossibleRouteMatch};
 use std::fmt::Debug;
 
@@ -6,8 +8,15 @@ impl PossibleRouteMatch for () {
         false
     }
 
-    fn test<'a>(&self, path: &'a str) -> Option<PartialPathMatch<'a>> {
-        Some(PartialPathMatch::new(path, vec![], ""))
+    fn test<'a>(
+        &self,
+        path: UrlContext<RouterUrlContext, &'a str>,
+    ) -> Option<PartialPathMatch<'a>> {
+        Some(PartialPathMatch::new(
+            path,
+            UrlContext::new(vec![]),
+            UrlContext::new(""),
+        ))
     }
 
     fn generate_path(&self, _path: &mut Vec<PathSegment>) {}
@@ -62,7 +71,10 @@ impl<T: AsPath> PossibleRouteMatch for StaticSegment<T> {
         false
     }
 
-    fn test<'a>(&self, path: &'a str) -> Option<PartialPathMatch<'a>> {
+    fn test<'a>(
+        &self,
+        path: UrlContext<RouterUrlContext, &'a str>,
+    ) -> Option<PartialPathMatch<'a>> {
         let mut matched_len = 0;
         let mut test = path.chars().peekable();
         let mut this = self.0.as_path().chars();

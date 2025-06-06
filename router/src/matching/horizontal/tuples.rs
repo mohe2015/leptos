@@ -1,3 +1,5 @@
+use crate::location::{RouterUrlContext, UrlContext, UrlContexty as _};
+
 use super::{PartialPathMatch, PathSegment, PossibleRouteMatch};
 
 macro_rules! tuples {
@@ -103,7 +105,10 @@ where
         self.0.optional()
     }
 
-    fn test<'a>(&self, path: &'a str) -> Option<PartialPathMatch<'a>> {
+    fn test<'a>(
+        &self,
+        path: UrlContext<RouterUrlContext, &'a str>,
+    ) -> Option<PartialPathMatch<'a>> {
         let remaining = path;
         let PartialPathMatch {
             remaining,
@@ -112,7 +117,8 @@ where
         } = self.0.test(remaining)?;
         Some(PartialPathMatch {
             remaining,
-            matched: &path[0..matched.len()],
+            matched: (path, matched)
+                .map(|(path, matched)| &path[0..matched.len()]),
             params,
         })
     }
