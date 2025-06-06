@@ -1,4 +1,4 @@
-use crate::location::{RouterUrlContext, UrlContext};
+use crate::location::{RouterUrlContext, UrlContext, UrlContexty as _};
 
 use super::{PartialPathMatch, PathSegment, PossibleRouteMatch};
 use std::fmt::Debug;
@@ -76,7 +76,7 @@ impl<T: AsPath> PossibleRouteMatch for StaticSegment<T> {
         path: UrlContext<RouterUrlContext, &'a str>,
     ) -> Option<PartialPathMatch<'a>> {
         let mut matched_len = 0;
-        let mut test = path.chars().peekable();
+        let mut test = path.forget_context(RouterUrlContext).chars().peekable();
         let mut this = self.0.as_path().chars();
         let mut has_matched =
             self.0.as_path().is_empty() || self.0.as_path() == "/";
@@ -92,7 +92,7 @@ impl<T: AsPath> PossibleRouteMatch for StaticSegment<T> {
             {
                 this.next();
             }
-        } else if !path.is_empty() {
+        } else if !path.test(|path| path.is_empty()) {
             // Path must start with `/` otherwise we are not certain about being at the beginning of the segment in the path
             return None;
         }
@@ -127,17 +127,23 @@ impl<T: AsPath> PossibleRouteMatch for StaticSegment<T> {
         }
 
         // build the match object
-        let (matched, remaining) = if matched_len == 1 && path.starts_with('/')
-        {
-            // If only thing that matched is `/` we can't eat it, otherwise next invocation of the
-            // test function will not be able to tell that we are matching from the beginning of the path segment
-            ("/", path)
-        } else {
-            // the remaining is built from the path in, with the slice moved
-            // by the length of this match
-            path.split_at(matched_len)
-        };
-        has_matched.then(|| PartialPathMatch::new(remaining, vec![], matched))
+        let (matched, remaining) =
+            if matched_len == 1 && path.test(|path| path.starts_with('/')) {
+                // If only thing that matched is `/` we can't eat it, otherwise next invocation of the
+                // test function will not be able to tell that we are matching from the beginning of the path segment
+                ("/", path.forget_context(RouterUrlContext))
+            } else {
+                // the remaining is built from the path in, with the slice moved
+                // by the length of this match
+                path.forget_context(RouterUrlContext).split_at(matched_len)
+            };
+        has_matched.then(|| {
+            PartialPathMatch::new(
+                UrlContext::new(remaining),
+                UrlContext::new(vec![]),
+                UrlContext::new(matched),
+            )
+        })
     }
 
     fn generate_path(&self, path: &mut Vec<PathSegment>) {
