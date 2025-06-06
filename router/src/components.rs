@@ -7,7 +7,7 @@ use crate::{
     hooks::use_navigate,
     location::{
         BrowserRouter, Location, LocationChange, LocationProvider,
-        RouterUrlContext, State, Url, UrlContext,
+        RouterUrlContext, State, Url, UrlContext, UrlContexty as _,
     },
     navigate::NavigateOptions,
     nested_router::NestedRoutesView,

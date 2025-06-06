@@ -3,6 +3,7 @@ use crate::{
     hooks::{has_router, use_navigate, use_resolved_path},
     location::{
         BrowserRouter, BrowserUrlContext, LocationProvider, UrlContext,
+        UrlContexty as _,
     },
     NavigateOptions,
 };

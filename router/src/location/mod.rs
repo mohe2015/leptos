@@ -513,11 +513,11 @@ where
                     .as_ref()
                     .map(|o| o.as_str())
                     .change_context(BrowserUrlContext)
-                || (!router_base.test(|router_base| router_base.is_empty())
-                    && !path_name.test(|path_name| path_name.is_empty())
+                || (!router_base.as_ref().test(|router_base| router_base.is_empty())
+                    && !path_name.as_ref().test(|path_name| path_name.is_empty())
                     // NOTE: the two `to_lowercase()` calls here added a total of about 14kb to
                     // release binary size, for limited gain
-                    && !path_name.test(|path_name| path_name.starts_with(&**router_base.as_ref().forget_context(RouterUrlContext))))
+                    && !path_name.as_ref().test(|path_name| path_name.starts_with(&**router_base.as_ref().forget_context(RouterUrlContext))))
             {
                 return Ok(());
             }

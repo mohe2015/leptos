@@ -1,6 +1,6 @@
 use super::{Url, BASE};
 use crate::{
-    location::{BrowserUrlContext, UrlContext},
+    location::{BrowserUrlContext, UrlContext, UrlContexty as _},
     params::ParamsMap,
 };
 use std::sync::Arc;
