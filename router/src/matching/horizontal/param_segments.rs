@@ -1,4 +1,4 @@
-use crate::location::{RouterUrlContext, UrlContext};
+use crate::location::{RouterUrlContext, UrlContext, UrlContexty as _};
 
 use super::{PartialPathMatch, PathSegment, PossibleRouteMatch};
 use core::iter;
@@ -48,14 +48,14 @@ impl PossibleRouteMatch for ParamSegment {
         let mut matched_len = 0;
         let mut param_offset = 0;
         let mut param_len = 0;
-        let mut test = path.chars();
+        let test = path.map(|path| path.chars());
 
         // match an initial /
-        if let Some('/') = test.next() {
+        if let Some('/') = test.forget_context(RouterUrlContext).next() {
             matched_len += 1;
             param_offset = 1;
         }
-        for char in test {
+        for char in test.forget_context(RouterUrlContext) {
             // when we get a closing /, stop matching
             if char == '/' {
                 break;
@@ -67,16 +67,26 @@ impl PossibleRouteMatch for ParamSegment {
             }
         }
 
-        if matched_len == 0 || (matched_len == 1 && path.starts_with('/')) {
+        if matched_len == 0
+            || (matched_len == 1 && path.test(|path| path.starts_with('/')))
+        {
             return None;
         }
 
-        let (matched, remaining) = path.split_at(matched_len);
-        let param_value = vec![(
-            Cow::Borrowed(self.0),
-            path[param_offset..param_len + param_offset].to_string(),
-        )];
-        Some(PartialPathMatch::new(remaining, param_value, matched))
+        // TODO FIXME
+        let (matched, remaining) =
+            path.forget_context(RouterUrlContext).split_at(matched_len);
+        let param_value = path.map(|path| {
+            vec![(
+                Cow::Borrowed(self.0),
+                path[param_offset..param_len + param_offset].to_string(),
+            )]
+        });
+        Some(PartialPathMatch::new(
+            UrlContext::new(remaining),
+            param_value,
+            UrlContext::new(matched),
+        ))
     }
 
     fn generate_path(&self, path: &mut Vec<PathSegment>) {
