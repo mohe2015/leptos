@@ -77,23 +77,25 @@ impl<C: UrlContextType, T> UrlContext<C, T> {
     }
 }
 
-pub trait UrlContexty<C: UrlContextType, T> {
+pub trait UrlContexty<'a, C: UrlContextType, T, MutT> {
     fn test(self, mapper: impl FnOnce(T) -> bool) -> bool;
 
     fn map<Q>(self, mapper: impl FnOnce(T) -> Q) -> UrlContext<C, Q>;
 
-    fn map_opt<'a, Q>(
+    fn map_opt<Q>(
         self,
         mapper: impl FnOnce(T) -> Option<Q>,
     ) -> Option<UrlContext<C, Q>>;
 
-    fn map_mut<'a, Q>(
+    fn map_mut<Q>(
         &'a mut self,
-        mapper: impl FnOnce(&'a mut T) -> Q,
+        mapper: impl FnOnce(MutT) -> Q,
     ) -> UrlContext<C, Q>;
 }
 
-impl<C: UrlContextType, T1> UrlContexty<C, T1> for UrlContext<C, T1> {
+impl<'a, C: UrlContextType, T1> UrlContexty<'a, C, T1, &'a mut T1>
+    for UrlContext<C, T1>
+{
     fn test(self, mapper: impl FnOnce(T1) -> bool) -> bool {
         mapper(self.0)
     }
@@ -102,14 +104,14 @@ impl<C: UrlContextType, T1> UrlContexty<C, T1> for UrlContext<C, T1> {
         UrlContext(mapper(self.0), PhantomData)
     }
 
-    fn map_opt<'a, Q>(
+    fn map_opt<Q>(
         self,
         mapper: impl FnOnce(T1) -> Option<Q>,
     ) -> Option<UrlContext<C, Q>> {
         Some(UrlContext(mapper(self.0)?, PhantomData))
     }
 
-    fn map_mut<'a, Q>(
+    fn map_mut<Q>(
         &'a mut self,
         mapper: impl FnOnce(&'a mut T1) -> Q,
     ) -> UrlContext<C, Q> {
@@ -117,7 +119,8 @@ impl<C: UrlContextType, T1> UrlContexty<C, T1> for UrlContext<C, T1> {
     }
 }
 
-impl<C: UrlContextType, T1, T2> UrlContexty<C, (T1, T2)>
+impl<'a, C: UrlContextType, T1, T2>
+    UrlContexty<'a, C, (T1, T2), (&'a mut T1, &'a mut T2)>
     for (UrlContext<C, T1>, UrlContext<C, T2>)
 {
     fn test(self, mapper: impl FnOnce((T1, T2)) -> bool) -> bool {
@@ -128,16 +131,16 @@ impl<C: UrlContextType, T1, T2> UrlContexty<C, (T1, T2)>
         UrlContext(mapper((self.0 .0, self.1 .0)), PhantomData)
     }
 
-    fn map_opt<'a, Q>(
+    fn map_opt<Q>(
         self,
         mapper: impl FnOnce((T1, T2)) -> Option<Q>,
     ) -> Option<UrlContext<C, Q>> {
         Some(UrlContext(mapper((self.0 .0, self.1 .0))?, PhantomData))
     }
 
-    fn map_mut<'a, Q>(
+    fn map_mut<Q>(
         &'a mut self,
-        mapper: impl FnOnce(&'a mut (T1, T2)) -> Q,
+        mapper: impl FnOnce((&'a mut T1, &'a mut T2)) -> Q,
     ) -> UrlContext<C, Q> {
         UrlContext(mapper((&mut self.0 .0, &mut self.1 .0)), PhantomData)
     }
