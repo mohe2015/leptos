@@ -128,8 +128,9 @@ where
     let set = SignalSetter::map(move |value: Option<T>| {
         let path = location.pathname.get_untracked();
         let hash = location.hash.get_untracked();
-        let qs = location.query.read_untracked().to_query_string();
-        let new_url = format!("{path}{qs}{hash}");
+        let qs = location.query.read_untracked().map(|q| q.to_query_string());
+        let new_url = (path, qs, hash)
+            .map(|(path, qs, hash)| format!("{path}{qs}{hash}"));
         query_mutations
             .write_value()
             .push((key.clone(), value.as_ref().map(ToString::to_string)));

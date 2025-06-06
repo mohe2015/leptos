@@ -19,9 +19,11 @@ pub fn resolve_path<'a>(
         let result = if let Some(from_path) = from_path {
             if path.test(|path| path.starts_with('/')) {
                 base_path
-            } else if (from_path, base_path).test(|(from_path, base_path)| {
-                from_path.find(base_path.as_ref()) != Some(0)
-            }) {
+            } else if (from_path.as_ref(), base_path.as_ref()).test(
+                |(from_path, base_path)| {
+                    from_path.find(base_path.as_ref()) != Some(0)
+                },
+            ) {
                 (base_path, from_path)
                     .map(|(base_path, from_path)| base_path + from_path)
             } else {
@@ -31,7 +33,7 @@ pub fn resolve_path<'a>(
             base_path
         };
 
-        let result_empty = result.test(|result| result.is_empty());
+        let result_empty = result.as_ref().test(|result| result.is_empty());
         let prefix = if result_empty {
             UrlContext::new("/".into())
         } else {

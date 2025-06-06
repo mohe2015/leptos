@@ -135,22 +135,21 @@ pub(crate) struct RouterContext {
 impl RouterContext {
     pub fn navigate(
         &self,
-        path: &UrlContext<RouterUrlContext, &str>,
+        path: UrlContext<RouterUrlContext, &str>,
         options: NavigateOptions,
     ) {
         let current = self.current_url.read_untracked();
         let resolved_to = if options.resolve {
             resolve_path(
-                &self
-                    .base
+                self.base
                     .as_ref()
                     .map(|base| base.as_deref().unwrap_or_default()),
                 path,
                 // TODO this should be relative to the current *Route*, I think...
-                &current.path().map(|path| Some(path)),
+                current.path().map(|path| Some(path)),
             )
         } else {
-            resolve_path(&UrlContext::new(""), path, &UrlContext::new(None))
+            resolve_path(UrlContext::new(""), path, UrlContext::new(None))
         };
 
         let mut url = match BrowserRouter::parse(&resolved_to) {
