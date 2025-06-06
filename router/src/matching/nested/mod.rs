@@ -216,20 +216,19 @@ where
         let this_was_optional = self.segments.optional();
 
         self.segments
-            .test(path.forget_context(RouterUrlContext))
+            .test(path)
             .and_then(
                 |PartialPathMatch {
                      remaining,
                      mut params,
                      matched,
                  }| {
-                    let mut params = UrlContext::new(params);
                     let (_, inner, remaining, was_optional_fallback) =
                         match &self.children {
                             None => (None, None, remaining, false),
                             Some(children) => {
-                                let (inner, remaining) = children
-                                    .match_nested(UrlContext::new(remaining));
+                                let (inner, remaining) =
+                                    children.match_nested(remaining);
 
                                 match inner {
                                     Some((id, inner)) => (
@@ -261,14 +260,14 @@ where
                             .as_ref()
                             .map(|inner| inner.as_matched())
                             .unwrap_or("");
-                        let rematch = path.map(|m| {
-                            m.trim_end_matches(&format!("{matched}{remaining}"))
-                        });
-                        let new_partial = rematch.map(|rematch| {
-                            self.segments.test(rematch).unwrap()
-                        });
-                        params =
-                            new_partial.map(|new_partial| new_partial.params);
+                        let rematch =
+                            (path, remaining).map(|(path, remaining)| {
+                                path.trim_end_matches(&format!(
+                                    "{matched}{remaining}"
+                                ))
+                            });
+                        let new_partial = self.segments.test(rematch).unwrap();
+                        params = new_partial.params;
                     }
 
                     let inner_params = inner
@@ -278,15 +277,20 @@ where
 
                     let id = RouteMatchId(self.id);
 
-                    if remaining.is_empty() || remaining == "/" {
-                        params.extend(inner_params);
+                    if remaining.test(|remaining| {
+                        remaining.is_empty() || remaining == "/"
+                    }) {
+                        params.map_mut(|params| params.extend(inner_params));
                         Some((
                             Some((
                                 id,
                                 NestedMatch {
                                     id,
-                                    matched: matched.to_string(),
-                                    params,
+                                    matched: matched
+                                        .forget_context(RouterUrlContext)
+                                        .to_string(),
+                                    params: params
+                                        .forget_context(RouterUrlContext),
                                     child: inner,
                                     view_fn: self.view.clone(),
                                 },
