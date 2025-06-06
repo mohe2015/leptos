@@ -77,8 +77,8 @@ impl<C: UrlContextType, T> UrlContext<C, T> {
     }
 }
 
-pub trait UrlContexty<'a, C: UrlContextType, T, MutT> {
-    fn test(self, mapper: impl FnOnce(T) -> bool) -> bool;
+pub trait UrlContexty<'a, C: UrlContextType, T, RefT, MutT> {
+    fn test(&'a self, mapper: impl FnOnce(RefT) -> bool) -> bool;
 
     fn map<Q>(self, mapper: impl FnOnce(T) -> Q) -> UrlContext<C, Q>;
 
@@ -93,11 +93,11 @@ pub trait UrlContexty<'a, C: UrlContextType, T, MutT> {
     ) -> UrlContext<C, Q>;
 }
 
-impl<'a, C: UrlContextType, T1> UrlContexty<'a, C, T1, &'a mut T1>
+impl<'a, C: UrlContextType, T1> UrlContexty<'a, C, T1, &'a T1, &'a mut T1>
     for UrlContext<C, T1>
 {
-    fn test(self, mapper: impl FnOnce(T1) -> bool) -> bool {
-        mapper(self.0)
+    fn test(&'a self, mapper: impl FnOnce(&'a T1) -> bool) -> bool {
+        mapper(&self.0)
     }
 
     fn map<Q>(self, mapper: impl FnOnce(T1) -> Q) -> UrlContext<C, Q> {
@@ -120,11 +120,11 @@ impl<'a, C: UrlContextType, T1> UrlContexty<'a, C, T1, &'a mut T1>
 }
 
 impl<'a, C: UrlContextType, T1, T2>
-    UrlContexty<'a, C, (T1, T2), (&'a mut T1, &'a mut T2)>
+    UrlContexty<'a, C, (T1, T2), (&'a T1, &'a T2), (&'a mut T1, &'a mut T2)>
     for (UrlContext<C, T1>, UrlContext<C, T2>)
 {
-    fn test(self, mapper: impl FnOnce((T1, T2)) -> bool) -> bool {
-        mapper((self.0 .0, self.1 .0))
+    fn test(&'a self, mapper: impl FnOnce((&'a T1, &'a T2)) -> bool) -> bool {
+        mapper((&self.0 .0, &self.1 .0))
     }
 
     fn map<Q>(self, mapper: impl FnOnce((T1, T2)) -> Q) -> UrlContext<C, Q> {
@@ -492,7 +492,7 @@ where
 
             let url = parse_with_base(
                 href.as_str(),
-                &origin.map(|origin| origin.as_str()),
+                &origin.as_ref().map(|origin| origin.as_str()),
             )
             .unwrap();
             let path_name =
@@ -503,12 +503,15 @@ where
             // let browser handle this event if it leaves our domain
             // or our base path
             if url.origin()
-                != origin.map(|o| o.as_str()).change_context(BrowserUrlContext)
-                || (!router_base.forget_context(RouterUrlContext).is_empty()
-                    && !path_name.forget_context(RouterUrlContext).is_empty()
+                != origin
+                    .as_ref()
+                    .map(|o| o.as_str())
+                    .change_context(BrowserUrlContext)
+                || (!router_base.test(|router_base| router_base.is_empty())
+                    && !path_name.test(|path_name| path_name.is_empty())
                     // NOTE: the two `to_lowercase()` calls here added a total of about 14kb to
                     // release binary size, for limited gain
-                    && !path_name.forget_context(RouterUrlContext).starts_with(&*router_base.forget_context(RouterUrlContext)))
+                    && !path_name.test(|path_name| path_name.starts_with(&**&*router_base.as_ref().forget_context(RouterUrlContext))))
             {
                 return Ok(());
             }
@@ -516,14 +519,24 @@ where
             // we've passed all the checks to navigate on the client side, so we prevent the
             // default behavior of the click
             ev.prevent_default();
-            let to = path_name
-                + if url.search().forget_context(RouterUrlContext).is_empty() {
-                    ""
-                } else {
-                    "?"
-                }
-                + &UrlContext::<RouterUrlContext, Url>::unescape(url.search())
-                + &UrlContext::<RouterUrlContext, Url>::unescape(url.hash());
+            let to = path_name.map(|path_name| {
+                path_name
+                    + if url
+                        .search()
+                        .forget_context(RouterUrlContext)
+                        .is_empty()
+                    {
+                        ""
+                    } else {
+                        "?"
+                    }
+                    + &UrlContext::<RouterUrlContext, Url>::unescape(
+                        url.search(),
+                    )
+                    .forget_context(RouterUrlContext)
+                    + &UrlContext::<RouterUrlContext, Url>::unescape(url.hash())
+                        .forget_context(RouterUrlContext)
+            });
             let state = Reflect::get(&a, &JsValue::from_str("state"))
                 .ok()
                 .and_then(|value| {
