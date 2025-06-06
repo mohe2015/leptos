@@ -76,6 +76,8 @@ impl<C: UrlContextType, T> UrlContext<C, T> {
 pub trait UrlContexty<'a, C: UrlContextType, T, RefT, MutT> {
     fn as_ref(&'a self) -> UrlContext<C, RefT>;
 
+    fn as_mut(&'a mut self) -> UrlContext<C, MutT>;
+
     fn test(self, mapper: impl FnOnce(T) -> bool) -> bool;
 
     fn map<Q>(self, mapper: impl FnOnce(T) -> Q) -> UrlContext<C, Q>;
@@ -96,6 +98,10 @@ impl<'a, C: UrlContextType, T1> UrlContexty<'a, C, T1, &'a T1, &'a mut T1>
 {
     fn as_ref(&'a self) -> UrlContext<C, &'a T1> {
         UrlContext(&self.0, PhantomData)
+    }
+
+    fn as_mut(&'a mut self) -> UrlContext<C, &'a mut T1> {
+        UrlContext(&mut self.0, PhantomData)
     }
 
     fn test(self, mapper: impl FnOnce(T1) -> bool) -> bool {
@@ -127,6 +133,10 @@ impl<'a, C: UrlContextType, T1, T2>
 {
     fn as_ref(&'a self) -> UrlContext<C, (&'a T1, &'a T2)> {
         UrlContext((&self.0 .0, &self.1 .0), PhantomData)
+    }
+
+    fn as_mut(&'a mut self) -> UrlContext<C, (&'a mut T1, &'a mut T2)> {
+        UrlContext((&mut self.0 .0, &mut self.1 .0), PhantomData)
     }
 
     fn test(self, mapper: impl FnOnce((T1, T2)) -> bool) -> bool {

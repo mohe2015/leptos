@@ -1,7 +1,9 @@
 use crate::{
     flat_router::MatchedRoute,
     hooks::Matched,
-    location::{LocationProvider, RouterUrlContext, Url, UrlContext},
+    location::{
+        LocationProvider, RouterUrlContext, Url, UrlContext, UrlContexty as _,
+    },
     matching::RouteDefs,
     params::ParamsMap,
     view_transition::start_view_transition,
@@ -93,8 +95,7 @@ where
         let path = url.path().map(|u| u.to_string());
 
         // match the route
-        let new_match =
-            routes.match_route(url.path().forget_context(RouterUrlContext));
+        let new_match = routes.match_route(url.path());
 
         // start with an empty view because we'll be loading routes async
         let view = EitherOf3::A(()).build();
@@ -152,9 +153,7 @@ where
             state.path.map_mut(|p| p.push_str(url_snapshot))
         });
 
-        let new_match = self
-            .routes
-            .match_route(url_snapshot.path().forget_context(RouterUrlContext));
+        let new_match = self.routes.match_route(url_snapshot.path());
 
         state.current_url.set(url_snapshot);
 
@@ -334,9 +333,7 @@ where
             let current_url = current_url.read_untracked();
 
             let mut outlets = Vec::new();
-            let new_match = routes.match_route(
-                current_url.path().forget_context(RouterUrlContext),
-            );
+            let new_match = routes.match_route(current_url.path());
             let view = match new_match {
                 None => Either::Left(fallback()),
                 Some(route) => {
@@ -439,7 +436,7 @@ where
         let mut loaders = Vec::new();
         let mut outlets = Vec::new();
         let url = current_url.read_untracked();
-        let path = url.path().to_string();
+        let path = url.path().map(|path| path.to_string());
 
         // match the route
         let new_match = routes.match_route(url.path());

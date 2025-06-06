@@ -1,4 +1,8 @@
-use crate::{components::RouterContext, hooks::use_resolved_path};
+use crate::{
+    components::RouterContext,
+    hooks::use_resolved_path,
+    location::{RouterUrlContext, UrlContext, UrlContexty as _},
+};
 use leptos::{children::Children, oco::Oco, prelude::*};
 use reactive_graph::{computed::ArcMemo, owner::use_context};
 use std::{borrow::Cow, rc::Rc};
@@ -119,7 +123,7 @@ where
                 current_url.with(|loc| {
                     let loc = loc.path();
                     if exact {
-                        loc == path
+                        loc.test(|loc| loc == path)
                     } else {
                         is_active_for(path, loc, strict_trailing_slash)
                     }
@@ -147,18 +151,19 @@ where
 // Test if `href` is active for `location`.  Assumes _both_ `href` and `location` begin with a `'/'`.
 fn is_active_for(
     href: &str,
-    location: &str,
+    location: UrlContext<RouterUrlContext, &str>,
     strict_trailing_slash: bool,
 ) -> bool {
     let mut href_f = href.split('/');
     // location _must_ be consumed first to avoid draining href_f early
     // also using enumerate to special case _the first two_ so that the allowance for ignoring the comparison
     // with the loc fragment on an emtpy href fragment for non root related parts.
-    std::iter::zip(location.split('/'), href_f.by_ref())
-        .enumerate()
-        .all(|(c, (loc_p, href_p))| {
-            loc_p == href_p || href_p.is_empty() && c > 1
-        })
+    std::iter::zip(
+        location.forget_context(RouterUrlContext).split('/'),
+        href_f.by_ref(),
+    )
+    .enumerate()
+    .all(|(c, (loc_p, href_p))| loc_p == href_p || href_p.is_empty() && c > 1)
         && match href_f.next() {
             // when no href fragments remain, location is definitely somewhere nested inside href
             None => true,

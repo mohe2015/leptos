@@ -1,10 +1,14 @@
 use crate::{
     components::RouterContext,
-    location::{Location, RouterUrlContext, Url, UrlContext},
+    location::{Location, RouterUrlContext, Url, UrlContext, UrlContexty as _},
     navigate::NavigateOptions,
     params::{Params, ParamsError, ParamsMap},
 };
-use leptos::{leptos_dom::helpers::request_animation_frame, oco::Oco};
+use leptos::{
+    leptos_dom::helpers::request_animation_frame,
+    oco::Oco,
+    prelude::{ArcMappedSignal, Signal},
+};
 use reactive_graph::{
     computed::{ArcMemo, Memo},
     owner::{expect_context, use_context},
@@ -202,19 +206,23 @@ where
 }
 
 #[track_caller]
-fn use_url_raw() -> ArcRwSignal<Url> {
+fn use_url_raw() -> ArcMappedSignal<Url> {
     use_context().unwrap_or_else(|| {
         let RouterContext { current_url, .. } = use_context().expect(
             "Tried to access reactive URL outside a <Router> component.",
         );
-        current_url
+        ArcMappedSignal::new(
+            current_url,
+            |a| a.as_ref().forget_context(RouterUrlContext),
+            |a| a.as_mut().forget_context(RouterUrlContext),
+        )
     })
 }
 
 /// Gives reactive access to the current URL.
 #[track_caller]
-pub fn use_url() -> ReadSignal<Url> {
-    use_url_raw().read_only().into()
+pub fn use_url() -> Signal<Url> {
+    use_url_raw().into()
 }
 
 /// Returns a raw key-value map of the URL search query.
