@@ -186,7 +186,7 @@ impl RouterContext {
         if url.origin() != current.origin() {
             window()
                 .location()
-                .set_href(path.dupe().forget_context(RouterUrlContext))
+                .set_href(path.forget_context(RouterUrlContext))
                 .unwrap();
             return;
         }

@@ -207,7 +207,10 @@ where
     fn match_nested<'a>(
         &'a self,
         path: UrlContext<RouterUrlContext, &'a str>,
-    ) -> (Option<(RouteMatchId, Self::Match)>, &'a str) {
+    ) -> (
+        Option<(RouteMatchId, Self::Match)>,
+        UrlContext<RouterUrlContext, &'a str>,
+    ) {
         // if this was optional (for example, this whole nested route definition consisted of an optional param),
         // then we'll need to retest the inner value against the starting path, if this one succeeds and the inner one fails
         let this_was_optional = self.segments.optional();

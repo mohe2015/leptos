@@ -11,12 +11,13 @@ use tachys::{erased::Erased, prelude::IntoMaybeErased};
 pub struct AnyNestedRoute {
     value: Erased,
     clone: fn(&Erased) -> AnyNestedRoute,
-    match_nested:
-        for<'a> fn(
-            &'a Erased,
-            UrlContext<RouterUrlContext, &'a str>,
-        )
-            -> (Option<(RouteMatchId, AnyNestedMatch)>, &'a str),
+    match_nested: for<'a> fn(
+        &'a Erased,
+        UrlContext<RouterUrlContext, &'a str>,
+    ) -> (
+        Option<(RouteMatchId, AnyNestedMatch)>,
+        UrlContext<RouterUrlContext, &'a str>,
+    ),
     generate_routes: fn(&Erased) -> Vec<GeneratedRouteData>,
     optional: fn(&Erased) -> bool,
 }
@@ -61,7 +62,10 @@ where
         fn match_nested<'a, T: MatchNestedRoutes + Send + Clone + 'static>(
             value: &'a Erased,
             path: UrlContext<RouterUrlContext, &'a str>,
-        ) -> (Option<(RouteMatchId, AnyNestedMatch)>, &'a str) {
+        ) -> (
+            Option<(RouteMatchId, AnyNestedMatch)>,
+            UrlContext<RouterUrlContext, &'a str>,
+        ) {
             let (maybe_match, path) = value.get_ref::<T>().match_nested(path);
             (
                 maybe_match
@@ -99,7 +103,10 @@ impl MatchNestedRoutes for AnyNestedRoute {
     fn match_nested<'a>(
         &'a self,
         path: UrlContext<RouterUrlContext, &'a str>,
-    ) -> (Option<(RouteMatchId, Self::Match)>, &'a str) {
+    ) -> (
+        Option<(RouteMatchId, Self::Match)>,
+        UrlContext<RouterUrlContext, &'a str>,
+    ) {
         (self.match_nested)(&self.value, path)
     }
 

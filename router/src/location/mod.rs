@@ -29,7 +29,7 @@ pub trait UrlContextType {
     fn produce_from_thin_air() -> Self;
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
 pub struct BrowserUrlContext;
 
 impl UrlContextType for BrowserUrlContext {
@@ -38,7 +38,7 @@ impl UrlContextType for BrowserUrlContext {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
 pub struct RouterUrlContext;
 
 impl UrlContextType for RouterUrlContext {
@@ -47,18 +47,12 @@ impl UrlContextType for RouterUrlContext {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
 pub struct UrlContext<C: UrlContextType, T>(T, PhantomData<C>);
 
 impl<C: UrlContextType, T> UrlContext<C, UrlContext<C, T>> {
     pub fn flatten(self) -> UrlContext<C, T> {
         UrlContext(self.0 .0, PhantomData)
-    }
-}
-
-impl<C: UrlContextType, T: Copy> UrlContext<C, T> {
-    pub fn dupe(&self) -> UrlContext<C, T> {
-        UrlContext(self.0, PhantomData)
     }
 }
 

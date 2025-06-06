@@ -154,7 +154,10 @@ pub trait MatchNestedRoutes {
     fn match_nested<'a>(
         &'a self,
         path: UrlContext<RouterUrlContext, &'a str>,
-    ) -> (Option<(RouteMatchId, Self::Match)>, &'a str);
+    ) -> (
+        Option<(RouteMatchId, Self::Match)>,
+        UrlContext<RouterUrlContext, &'a str>,
+    );
 
     fn generate_routes(
         &self,
