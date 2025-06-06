@@ -16,7 +16,7 @@ macro_rules! tuples {
                 [$first.optional(), $($ty.optional()),*].into_iter().any(|n| n)
             }
 
-            fn test<'a>(&self, path: &'a str) -> Option<PartialPathMatch<'a>> {
+            fn test<'a>(&self, path: UrlContext<RouterUrlContext, &'a str>) -> Option<PartialPathMatch<'a>> {
                 #[allow(non_snake_case)]
                 let ($first, $($ty,)*) = &self;
 
