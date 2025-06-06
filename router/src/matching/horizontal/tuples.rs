@@ -30,7 +30,7 @@ macro_rules! tuples {
                     let mut matched_len = 0;
                     let mut r = path;
 
-                    let mut p = Vec::new();
+                    let mut p = UrlContext::new(Vec::new());
                     let mut m = String::new();
 
                     if $first.optional() {
@@ -42,8 +42,8 @@ macro_rules! tuples {
                                 return None;
                             },
                             Some(PartialPathMatch { remaining, matched, params }) => {
-                                p.extend(params.into_iter());
-                                m.push_str(matched);
+                                (p.map_mut(|p| p), params).map(|(p, params)| p.extend(params.into_iter()));
+                                m.push_str(matched.forget_context(RouterUrlContext));
                                 r = remaining;
                             },
                         }
@@ -72,13 +72,13 @@ macro_rules! tuples {
                                 Some(v) => v,
                             };
                             r = remaining;
-                            matched_len += matched.len();
-                            p.extend(params);
+                            matched_len += matched.forget_context(RouterUrlContext).len();
+                            (p.map_mut(|p| p), params).map(|(p, params)| p.extend(params.into_iter()));
                         }
                     )*
                     return Some(PartialPathMatch {
                         remaining: r,
-                        matched: &path[0..matched_len],
+                        matched: path.map(|path| &path[0..matched_len]),
                         params: p
                     });
                 }
