@@ -152,13 +152,14 @@ impl RouterContext {
             resolve_path(UrlContext::new(""), path, UrlContext::new(None))
         };
 
-        let mut url = match BrowserRouter::parse(&resolved_to) {
-            Ok(url) => url,
-            Err(e) => {
-                leptos::logging::error!("Error parsing URL: {e:?}");
-                return;
-            }
-        };
+        let mut url =
+            match BrowserRouter::parse(resolved_to.as_ref().map(|r| &**r)) {
+                Ok(url) => url,
+                Err(e) => {
+                    leptos::logging::error!("Error parsing URL: {e:?}");
+                    return;
+                }
+            };
         let query_mutations =
             mem::take(&mut *self.query_mutations.write_value());
         if !query_mutations.is_empty() {
@@ -617,7 +618,7 @@ pub fn Redirect<P>(
         }
         let navigate = use_navigate();
         navigate(
-            &path.as_ref().map(|path| path.as_str()),
+            path.as_ref().map(|path| path.as_str()),
             options.unwrap_or_default(),
         );
     }

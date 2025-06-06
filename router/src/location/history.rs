@@ -101,22 +101,26 @@ impl LocationProvider for BrowserRouter {
     }
 
     fn parse(
-        url: &str,
+        url: UrlContext<RouterUrlContext, &str>,
     ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
         let base = UrlContext::<BrowserUrlContext, _>::new(
             window().location().origin()?,
         );
-        Self::parse_with_base(url, &base.as_ref().map(|base| base.as_str()))
+        Self::parse_with_base(url, base.as_ref().map(|base| base.as_str()))
     }
 
     fn parse_with_base(
-        url: &str,
-        base: &UrlContext<BrowserUrlContext, &str>,
+        url: UrlContext<RouterUrlContext, &str>,
+        base: UrlContext<BrowserUrlContext, &str>,
     ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
         // TODO FIXME unwrap
-        let location = base
-            .as_ref()
-            .map(|base| web_sys::Url::new_with_base(url, base).unwrap());
+        let location = base.as_ref().map(|base| {
+            web_sys::Url::new_with_base(
+                url.forget_context(RouterUrlContext),
+                base,
+            )
+            .unwrap()
+        });
         Ok(location
             .map(|location| {
                 Url {

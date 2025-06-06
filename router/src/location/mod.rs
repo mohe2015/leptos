@@ -494,14 +494,14 @@ pub trait LocationProvider: Clone + 'static {
     fn complete_navigation(&self, loc: &LocationChange);
 
     fn parse(
-        url: &str,
+        url: UrlContext<RouterUrlContext, &str>,
     ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
-        Self::parse_with_base(url, &BASE)
+        Self::parse_with_base(url, BASE)
     }
 
     fn parse_with_base(
-        url: &str,
-        base: &UrlContext<BrowserUrlContext, &str>,
+        url: UrlContext<RouterUrlContext, &str>,
+        base: UrlContext<BrowserUrlContext, &str>,
     ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error>;
 
     fn redirect(loc: &UrlContext<RouterUrlContext, &str>);
@@ -545,8 +545,8 @@ where
 pub(crate) fn handle_anchor_click<NavFn, NavFut>(
     router_base: UrlContext<RouterUrlContext, Option<Cow<'static, str>>>,
     parse_with_base: fn(
-        &str,
-        &UrlContext<BrowserUrlContext, &str>,
+        UrlContext<RouterUrlContext, &str>,
+        UrlContext<BrowserUrlContext, &str>,
     )
         -> Result<UrlContext<RouterUrlContext, Url>, JsValue>,
     navigate: NavFn,
@@ -604,8 +604,8 @@ where
             }
 
             let url = parse_with_base(
-                href.as_str(),
-                &origin.as_ref().map(|origin| origin.as_str()),
+                UrlContext::new(href.as_str()),
+                origin.as_ref().map(|origin| origin.as_str()),
             )
             .unwrap();
             let path_name =

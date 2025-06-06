@@ -162,9 +162,10 @@ where
                                 // get returned from a server function
                                 if resp.redirected() {
                                     let resp_url = &resp.url();
-                                    match BrowserRouter::parse(
+                                    match BrowserRouter::parse(UrlContext::new(
+                                        // TODO FIXME
                                         resp_url.as_str(),
-                                    ) {
+                                    )) {
                                         Ok(url) => {
                                             if url.origin()
                                                 != current_window_origin()
@@ -251,7 +252,8 @@ where
                                 if resp.redirected() {
                                     let resp_url = &resp.url();
                                     match BrowserRouter::parse(
-                                        resp_url.as_str(),
+                                        // TODO FIXME
+                                        UrlContext::new(resp_url.as_str()),
                                     ) {
                                         Ok(url) => {
                                             if url.origin()
