@@ -48,14 +48,14 @@ impl PossibleRouteMatch for ParamSegment {
         let mut matched_len = 0;
         let mut param_offset = 0;
         let mut param_len = 0;
-        let test = path.map(|path| path.chars());
+        let mut test = path.forget_context(RouterUrlContext).chars();
 
         // match an initial /
-        if let Some('/') = test.forget_context(RouterUrlContext).next() {
+        if let Some('/') = test.next() {
             matched_len += 1;
             param_offset = 1;
         }
-        for char in test.forget_context(RouterUrlContext) {
+        for char in test {
             // when we get a closing /, stop matching
             if char == '/' {
                 break;
@@ -151,7 +151,7 @@ impl PossibleRouteMatch for WildcardSegment {
         let mut matched_len = 0;
         let mut param_offset = 0;
         let mut param_len = 0;
-        let mut test = path.chars();
+        let mut test = path.forget_context(RouterUrlContext).chars();
 
         // match an initial /
         if let Some('/') = test.next() {
@@ -163,15 +163,22 @@ impl PossibleRouteMatch for WildcardSegment {
             param_len += char.len_utf8();
         }
 
-        let (matched, remaining) = path.split_at(matched_len);
-        let param_value = iter::once((
-            Cow::Borrowed(self.0),
-            path[param_offset..param_len + param_offset].to_string(),
-        ));
+        let (matched, remaining) =
+            path.forget_context(RouterUrlContext).split_at(matched_len);
+        let param_value = path.map(|path| {
+            {
+                iter::once((
+                    Cow::Borrowed(self.0),
+                    path[param_offset..param_len + param_offset].to_string(),
+                ))
+            }
+            .into_iter()
+            .collect()
+        });
         Some(PartialPathMatch::new(
-            remaining,
-            param_value.into_iter().collect(),
-            matched,
+            UrlContext::new(remaining),
+            param_value,
+            UrlContext::new(matched),
         ))
     }
 
