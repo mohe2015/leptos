@@ -175,6 +175,49 @@ pub struct Url {
     hash: String,
 }
 
+// these are currently needed so the public api does not change too much
+impl Url {
+    pub fn origin(&self) -> &str {
+        &self.origin
+    }
+
+    pub fn origin_mut(&mut self) -> &mut String {
+        &mut self.origin
+    }
+
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    pub fn path_mut(&mut self) -> &mut str {
+        &mut self.path
+    }
+
+    pub fn search(&self) -> &str {
+        &self.search
+    }
+
+    pub fn search_mut(&mut self) -> &mut String {
+        &mut self.search
+    }
+
+    pub fn search_params(&self) -> &ParamsMap {
+        &self.search_params
+    }
+
+    pub fn search_params_mut(&mut self) -> &mut ParamsMap {
+        &mut self.search_params
+    }
+
+    pub fn hash(&self) -> &str {
+        &self.hash
+    }
+
+    pub fn hash_mut(&mut self) -> &mut String {
+        &mut self.hash
+    }
+}
+
 impl<C: UrlContextType> UrlContext<C, Url> {
     pub fn origin(&self) -> UrlContext<C, &str> {
         self.as_ref().map(|u| u.origin.as_str())
