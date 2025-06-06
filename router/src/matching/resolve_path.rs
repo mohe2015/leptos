@@ -3,15 +3,17 @@ use std::borrow::Cow;
 use crate::location::{RouterUrlContext, UrlContext, UrlContextType};
 
 pub fn resolve_path<'a>(
-    base: &UrlContext<RouterUrlContext, &'a str>,
-    path: &UrlContext<RouterUrlContext, &'a str>,
-    from: &UrlContext<RouterUrlContext, Option<&'a str>>,
+    base: UrlContext<RouterUrlContext, &'a str>,
+    path: UrlContext<RouterUrlContext, &'a str>,
+    from: UrlContext<RouterUrlContext, Option<&'a str>>,
 ) -> Cow<'a, str> {
     if has_scheme(path) {
         path.into()
     } else {
         let base_path = normalize(base, false);
-        let from_path = from.map(|from| normalize(from, false));
+        // map option inside
+        let from_path =
+            from.map_opt(|from| from).map(|from| normalize(from, false));
         let result = if let Some(from_path) = from_path {
             if path.starts_with('/') {
                 base_path
