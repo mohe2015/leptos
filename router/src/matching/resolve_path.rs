@@ -1,6 +1,8 @@
 use std::borrow::Cow;
 
-use crate::location::{RouterUrlContext, UrlContext, UrlContextType};
+use crate::location::{
+    RouterUrlContext, UrlContext, UrlContextType, UrlContexty as _,
+};
 
 pub fn resolve_path<'a>(
     base: UrlContext<RouterUrlContext, &'a str>,

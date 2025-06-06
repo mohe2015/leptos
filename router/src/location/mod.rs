@@ -99,7 +99,7 @@ impl<C: UrlContextType, T> UrlContext<C, T> {
     }
 }
 
-trait UrlContexty<T> {
+pub trait UrlContexty<T> {
     fn test(self, mapper: impl FnOnce(T) -> bool) -> bool;
 }
 
