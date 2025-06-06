@@ -260,14 +260,16 @@ where
         ..
     } = use_context()
         .expect("<Routes> should be used inside a <Router> component");
-    let base = base.as_ref().map(|base| {
-        let mut base = Oco::from(base);
-        base.upgrade_inplace();
-        base
+    let base = base.map(|base| {
+        base.map(|base| {
+            let mut base = Oco::from(base);
+            base.upgrade_inplace();
+            base
+        })
     });
     let routes = RouteDefs::new_with_base(
         children.into_inner(),
-        base.as_ref().clone().map(|v| v.unwrap_or_default()),
+        base.clone().map(|v| v.unwrap_or_default()),
     );
     let outer_owner =
         Owner::current().expect("creating Routes, but no Owner was found");
@@ -281,7 +283,7 @@ where
             routes: routes.clone(),
             outer_owner: outer_owner.clone(),
             current_url: current_url.clone(),
-            base: base.clone(),
+            base: base.clone().forget_context(RouterUrlContext),
             fallback: fallback.clone(),
             set_is_routing,
             transition,
@@ -316,14 +318,16 @@ where
 
     // TODO base
     #[allow(unused)]
-    let base = base.as_ref().map(|base| {
-        let mut base = Oco::from(base);
-        base.upgrade_inplace();
-        base
+    let base = base.map(|base| {
+        base.map(|base| {
+            let mut base = Oco::from(base);
+            base.upgrade_inplace();
+            base
+        })
     });
     let routes = RouteDefs::new_with_base(
         children.into_inner(),
-        base.as_ref().clone().map(|v| v.unwrap_or_default()),
+        base.map(|v| v.unwrap_or_default()),
     );
 
     let outer_owner =
