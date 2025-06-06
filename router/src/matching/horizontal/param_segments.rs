@@ -202,7 +202,7 @@ impl PossibleRouteMatch for OptionalParamSegment {
         let mut matched_len = 0;
         let mut param_offset = 0;
         let mut param_len = 0;
-        let mut test = path.chars();
+        let mut test = path.forget_context(RouterUrlContext).chars();
 
         // match an initial /
         if let Some('/') = test.next() {
@@ -221,22 +221,31 @@ impl PossibleRouteMatch for OptionalParamSegment {
             }
         }
 
-        let matched_len = if matched_len == 1 && path.starts_with('/') {
-            0
-        } else {
-            matched_len
-        };
-        let (matched, remaining) = path.split_at(matched_len);
-        let param_value = (matched_len > 0)
-            .then(|| {
-                (
-                    Cow::Borrowed(self.0),
-                    path[param_offset..param_len + param_offset].to_string(),
-                )
-            })
-            .into_iter()
-            .collect();
-        Some(PartialPathMatch::new(remaining, param_value, matched))
+        let matched_len =
+            if matched_len == 1 && path.test(|path| path.starts_with('/')) {
+                0
+            } else {
+                matched_len
+            };
+        let (matched, remaining) =
+            path.forget_context(RouterUrlContext).split_at(matched_len);
+        let param_value = path.map(|path| {
+            (matched_len > 0)
+                .then(|| {
+                    (
+                        Cow::Borrowed(self.0),
+                        path[param_offset..param_len + param_offset]
+                            .to_string(),
+                    )
+                })
+                .into_iter()
+                .collect()
+        });
+        Some(PartialPathMatch::new(
+            UrlContext::new(remaining),
+            param_value,
+            UrlContext::new(matched),
+        ))
     }
 
     fn generate_path(&self, path: &mut Vec<PathSegment>) {
