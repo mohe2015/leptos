@@ -2,8 +2,8 @@ use crate::{
     components::ToHref,
     hooks::{has_router, use_navigate, use_resolved_path},
     location::{
-        BrowserRouter, BrowserUrlContext, LocationProvider, UrlContext,
-        UrlContexty as _,
+        BrowserRouter, BrowserUrlContext, LocationProvider, RouterUrlContext,
+        UrlContext, UrlContexty as _,
     },
     NavigateOptions,
 };
@@ -205,7 +205,7 @@ where
                                                                 )
                                                             },
                                                         )
-                                                    }).flatten().as_ref().map(|v| v.as_str()),
+                                                    }).flatten().as_ref().map(|v| v.as_str()).forget_context(RouterUrlContext),
                                                     navigate_options,
                                                 )
                                             }
@@ -298,7 +298,10 @@ where
                                                         })
                                                         .flatten()
                                                         .as_ref()
-                                                        .map(|v| v.as_str()),
+                                                        .map(|v| v.as_str())
+                                                        .forget_context(
+                                                            RouterUrlContext,
+                                                        ),
                                                     navigate_options,
                                                 )
                                             }
@@ -318,7 +321,8 @@ where
                         navigate(
                             UrlContext::new(
                                 format!("{action}?{params}").as_str(),
-                            ),
+                            )
+                            .forget_context(RouterUrlContext),
                             navigate_options,
                         );
                     } else {

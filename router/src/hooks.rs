@@ -144,7 +144,10 @@ where
                 let nav_options = nav_options.clone();
                 move || {
                     navigate(
-                        new_url.as_ref().map(|u| u.as_str()),
+                        new_url
+                            .as_ref()
+                            .map(|u| u.as_str())
+                            .forget_context(RouterUrlContext),
                         nav_options.clone(),
                     );
                     IS_NAVIGATING.store(false, Ordering::Relaxed)
@@ -290,12 +293,11 @@ pub(crate) fn use_resolved_path(
 /// # }
 /// ```
 #[track_caller]
-pub fn use_navigate(
-) -> impl Fn(UrlContext<RouterUrlContext, &str>, NavigateOptions) + Clone {
+pub fn use_navigate() -> impl Fn(&str, NavigateOptions) + Clone {
     let cx = use_context::<RouterContext>()
         .expect("You cannot call `use_navigate` outside a <Router>.");
-    move |path: UrlContext<RouterUrlContext, &str>, options: NavigateOptions| {
-        cx.navigate(path, options)
+    move |path: &str, options: NavigateOptions| {
+        cx.navigate(UrlContext::new(path), options)
     }
 }
 

@@ -622,7 +622,9 @@ pub fn Redirect<P>(
         }
         let navigate = use_navigate();
         navigate(
-            path.as_ref().map(|path| path.as_str()),
+            path.as_ref()
+                .map(|path| path.as_str())
+                .forget_context(RouterUrlContext),
             options.unwrap_or_default(),
         );
     }
