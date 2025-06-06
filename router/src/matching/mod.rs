@@ -10,7 +10,7 @@ mod horizontal;
 mod nested;
 mod vertical;
 use crate::{
-    location::{RouterUrlContext, UrlContext},
+    location::{RouterUrlContext, UrlContext, UrlContexty as _},
     static_routes::RegenerationFn,
     Method, SsrMode,
 };
@@ -386,18 +386,19 @@ mod tests {
 #[derive(Debug)]
 pub struct PartialPathMatch<'a> {
     /// unmatched yet part of the path
-    pub(crate) remaining: &'a str,
+    pub(crate) remaining: UrlContext<RouterUrlContext, &'a str>,
     /// value of parameters encoded inside of the path
-    pub(crate) params: Vec<(Cow<'static, str>, String)>,
+    pub(crate) params:
+        UrlContext<RouterUrlContext, Vec<(Cow<'static, str>, String)>>,
     /// part of the original path that was matched by segment
-    pub(crate) matched: &'a str,
+    pub(crate) matched: UrlContext<RouterUrlContext, &'a str>,
 }
 
 impl<'a> PartialPathMatch<'a> {
     pub fn new(
-        remaining: &'a str,
-        params: Vec<(Cow<'static, str>, String)>,
-        matched: &'a str,
+        remaining: UrlContext<RouterUrlContext, &'a str>,
+        params: UrlContext<RouterUrlContext, Vec<(Cow<'static, str>, String)>>,
+        matched: UrlContext<RouterUrlContext, &'a str>,
     ) -> Self {
         Self {
             remaining,
@@ -407,18 +408,21 @@ impl<'a> PartialPathMatch<'a> {
     }
 
     pub fn is_complete(&self) -> bool {
-        self.remaining.is_empty() || self.remaining == "/"
+        self.remaining
+            .test(|remaining| remaining.is_empty() || remaining == "/")
     }
 
-    pub fn remaining(&self) -> &'a str {
+    pub fn remaining(&self) -> UrlContext<RouterUrlContext, &'a str> {
         self.remaining
     }
 
-    pub fn params(self) -> Vec<(Cow<'static, str>, String)> {
+    pub fn params(
+        self,
+    ) -> UrlContext<RouterUrlContext, Vec<(Cow<'static, str>, String)>> {
         self.params
     }
 
-    pub fn matched(&self) -> &'a str {
+    pub fn matched(&self) -> UrlContext<RouterUrlContext, &'a str> {
         self.matched
     }
 }

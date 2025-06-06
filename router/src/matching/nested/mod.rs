@@ -3,7 +3,7 @@ use super::{
     PartialPathMatch, PathSegment, PossibleRouteMatch, RouteMatchId,
 };
 use crate::{
-    location::{RouterUrlContext, UrlContext},
+    location::{RouterUrlContext, UrlContext, UrlContexty},
     ChooseView, GeneratedRouteData, MatchParams, Method, SsrMode,
 };
 use core::{fmt, iter};
@@ -216,19 +216,20 @@ where
         let this_was_optional = self.segments.optional();
 
         self.segments
-            .test(path)
+            .test(path.forget_context(RouterUrlContext))
             .and_then(
                 |PartialPathMatch {
                      remaining,
                      mut params,
                      matched,
                  }| {
+                    let mut params = UrlContext::new(params);
                     let (_, inner, remaining, was_optional_fallback) =
                         match &self.children {
                             None => (None, None, remaining, false),
                             Some(children) => {
-                                let (inner, remaining) =
-                                    children.match_nested(remaining);
+                                let (inner, remaining) = children
+                                    .match_nested(UrlContext::new(remaining));
 
                                 match inner {
                                     Some((id, inner)) => (
@@ -260,10 +261,14 @@ where
                             .as_ref()
                             .map(|inner| inner.as_matched())
                             .unwrap_or("");
-                        let rematch = path
-                            .trim_end_matches(&format!("{matched}{remaining}"));
-                        let new_partial = self.segments.test(rematch).unwrap();
-                        params = new_partial.params;
+                        let rematch = path.map(|m| {
+                            m.trim_end_matches(&format!("{matched}{remaining}"))
+                        });
+                        let new_partial = rematch.map(|rematch| {
+                            self.segments.test(rematch).unwrap()
+                        });
+                        params =
+                            new_partial.map(|new_partial| new_partial.params);
                     }
 
                     let inner_params = inner

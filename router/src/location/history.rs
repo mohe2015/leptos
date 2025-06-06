@@ -1,7 +1,9 @@
 use super::{handle_anchor_click, LocationChange, LocationProvider, Url};
 use crate::{
     hooks::use_navigate,
-    location::{BrowserUrlContext, RouterUrlContext, UrlContext},
+    location::{
+        BrowserUrlContext, RouterUrlContext, UrlContext, UrlContexty as _,
+    },
     params::ParamsMap,
 };
 use core::fmt;

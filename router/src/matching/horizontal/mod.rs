@@ -1,3 +1,5 @@
+use crate::location::{RouterUrlContext, UrlContext};
+
 use super::{PartialPathMatch, PathSegment};
 use std::sync::Arc;
 mod param_segments;
@@ -30,7 +32,10 @@ pub trait PossibleRouteMatch {
     /// 2. If you match just a path `"/"`, you should preserve the starting slash
     ///    in the [remaining](PartialPathMatch::remaining) part, so other segments which will be
     ///    tested can detect wherever they are matching from the beginning of the given path segment.
-    fn test<'a>(&self, path: &'a str) -> Option<PartialPathMatch<'a>>;
+    fn test<'a>(
+        &self,
+        path: UrlContext<RouterUrlContext, &'a str>,
+    ) -> Option<PartialPathMatch<'a>>;
 
     fn generate_path(&self, path: &mut Vec<PathSegment>);
 }
