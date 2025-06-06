@@ -229,7 +229,7 @@ pub fn use_url() -> Signal<Url> {
 #[track_caller]
 pub fn use_query_map() -> Memo<ParamsMap> {
     let url = use_url_raw();
-    Memo::new(move |_| url.with(|url| url.search_params.clone()))
+    Memo::new(move |_| url.with(|url| url.search_params().clone()))
 }
 
 /// Returns the current URL search query, parsed into the given type, or an error.

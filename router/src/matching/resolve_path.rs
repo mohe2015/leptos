@@ -8,9 +8,9 @@ pub fn resolve_path<'a>(
     base: UrlContext<RouterUrlContext, &'a str>,
     path: UrlContext<RouterUrlContext, &'a str>,
     from: UrlContext<RouterUrlContext, Option<&'a str>>,
-) -> Cow<'a, str> {
+) -> UrlContext<RouterUrlContext, Cow<'a, str>> {
     if has_scheme(path) {
-        path.into()
+        path.map(|path| path.into())
     } else {
         let base_path = normalize(base, false);
         // map option inside
@@ -22,7 +22,8 @@ pub fn resolve_path<'a>(
             } else if (from_path, base_path).test(|(from_path, base_path)| {
                 from_path.find(base_path.as_ref()) != Some(0)
             }) {
-                base_path + from_path
+                (base_path, from_path)
+                    .map(|(base_path, from_path)| base_path + from_path)
             } else {
                 from_path
             }
@@ -30,25 +31,31 @@ pub fn resolve_path<'a>(
             base_path
         };
 
-        let result_empty = result.is_empty();
-        let prefix = if result_empty { "/".into() } else { result };
+        let result_empty = result.test(|result| result.is_empty());
+        let prefix = if result_empty {
+            UrlContext::new("/".into())
+        } else {
+            result
+        };
 
-        prefix + normalize(path, result_empty)
+        (prefix, normalize(path, result_empty)).map(|(prefix, c)| prefix + c)
     }
 }
 
-fn has_scheme(path: &str) -> bool {
-    path.starts_with("//")
-        || path.starts_with("tel:")
-        || path.starts_with("mailto:")
-        || path
-            .split_once("://")
-            .map(|(prefix, _)| {
-                prefix.chars().all(
+fn has_scheme(path: UrlContext<RouterUrlContext, &str>) -> bool {
+    path.test(|path| {
+        path.starts_with("//")
+            || path.starts_with("tel:")
+            || path.starts_with("mailto:")
+            || path
+                .split_once("://")
+                .map(|(prefix, _)| {
+                    prefix.chars().all(
                     |c: char| matches!(c, 'a'..='z' | 'A'..='Z' | '0'..='9'),
                 )
-            })
-            .unwrap_or(false)
+                })
+                .unwrap_or(false)
+    })
 }
 
 #[doc(hidden)]
@@ -57,7 +64,7 @@ fn normalize<C: UrlContextType>(
     omit_slash: bool,
 ) -> UrlContext<C, Cow<'_, str>> {
     let s = path.map(|p| p.trim_start_matches('/'));
-    let trim_end = s.map(|s| {
+    let trim_end = s.as_ref().map(|s| {
         s.chars()
             .rev()
             .take_while(|c| *c == '/')
