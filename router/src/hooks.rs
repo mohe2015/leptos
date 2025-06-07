@@ -1,6 +1,9 @@
 use crate::{
     components::RouterContext,
-    location::{Location, RouterUrlContext, Url, UrlContext, UrlContexty as _},
+    location::{
+        BrowserUrlContext, Location, RouterUrlContext, Url, UrlContext,
+        UrlContexty as _,
+    },
     navigate::NavigateOptions,
     params::{Params, ParamsError, ParamsMap},
 };
@@ -265,7 +268,7 @@ pub(crate) fn use_resolved_path(
     let matched = use_context::<Matched>().map(|n| n.0);
     ArcMemo::new(move |_| {
         let path = path();
-        if path.starts_with('/') {
+        let path = if path.starts_with('/') {
             path
         } else {
             router
@@ -278,8 +281,16 @@ pub(crate) fn use_resolved_path(
                 )
                 .forget_context(RouterUrlContext)
                 .to_string()
-        }
-        // TODO HERE
+        };
+        let url = router
+            .location_provider
+            .as_ref()
+            .unwrap()
+            .router_to_browser_url(UrlContext::parse_with_default_base(
+                UrlContext::new(RouterUrlContext, &path),
+            ))
+            .unwrap();
+        url.to_full_path().forget_context(BrowserUrlContext)
     })
 }
 
