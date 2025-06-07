@@ -1,9 +1,8 @@
 use crate::{
-    components::ToHref,
+    components::{RouterContext, ToHref},
     hooks::{has_router, use_navigate, use_resolved_path},
     location::{
-        BrowserRouter, BrowserUrlContext, LocationProvider, RouterUrlContext,
-        UrlContext, UrlContexty as _,
+        BrowserUrlContext, RouterUrlContext, UrlContext, UrlContexty as _,
     },
     NavigateOptions,
 };
@@ -103,8 +102,10 @@ where
     ) -> impl IntoView {
         let action_version = version;
         let navigate = has_router.then(use_navigate);
+        let cx = use_context::<RouterContext>().expect("no router");
         let on_submit = {
             move |ev: web_sys::SubmitEvent| {
+                let cx = cx.clone();
                 let navigate = navigate.clone();
                 if ev.default_prevented() {
                     return;
@@ -162,10 +163,14 @@ where
                                 // get returned from a server function
                                 if resp.redirected() {
                                     let resp_url = &resp.url();
-                                    match BrowserRouter::parse(UrlContext::new(
-                                        // TODO FIXME
-                                        resp_url.as_str(),
-                                    )) {
+                                    match cx
+                                        .location_provider
+                                        .as_ref()
+                                        .unwrap()
+                                        .parse(UrlContext::new(
+                                            // TODO FIXME
+                                            resp_url.as_str(),
+                                        )) {
                                         Ok(url) => {
                                             if url.origin()
                                                 != current_window_origin()
@@ -251,10 +256,14 @@ where
                                 // get returned from a server function
                                 if resp.redirected() {
                                     let resp_url = &resp.url();
-                                    match BrowserRouter::parse(
-                                        // TODO FIXME
-                                        UrlContext::new(resp_url.as_str()),
-                                    ) {
+                                    match cx
+                                        .location_provider
+                                        .as_ref()
+                                        .unwrap()
+                                        .parse(
+                                            // TODO FIXME
+                                            UrlContext::new(resp_url.as_str()),
+                                        ) {
                                         Ok(url) => {
                                             if url.origin()
                                                 != current_window_origin()

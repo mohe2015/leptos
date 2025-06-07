@@ -1,8 +1,9 @@
-use super::{handle_anchor_click, LocationChange, LocationProvider, Url};
+use super::{handle_anchor_click, LocationChange, Url};
 use crate::{
     hooks::use_navigate,
     location::{
-        BrowserUrlContext, RouterUrlContext, UrlContext, UrlContexty as _,
+        BrowserUrlContext, RouterUrlContext, Routing, RoutingProvider,
+        UrlContext, UrlContexty as _,
     },
     params::ParamsMap,
 };
@@ -63,9 +64,7 @@ impl BrowserRouter {
     }
 }
 
-impl LocationProvider for BrowserRouter {
-    type Error = JsValue;
-
+impl RoutingProvider for BrowserRouter {
     fn new() -> Result<Self, JsValue> {
         let url = ArcRwSignal::new(Self::current()?);
         let path_stack = ArcStoredValue::new(
@@ -77,10 +76,6 @@ impl LocationProvider for BrowserRouter {
             path_stack,
             is_back: Default::default(),
         })
-    }
-
-    fn as_url(&self) -> &ArcRwSignal<UrlContext<RouterUrlContext, Url>> {
-        &self.url
     }
 
     fn current() -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
@@ -99,17 +94,27 @@ impl LocationProvider for BrowserRouter {
             hash: location.hash()?,
         }))
     }
+}
+
+impl Routing for BrowserRouter {
+    type Error = JsValue;
+
+    fn as_url(&self) -> &ArcRwSignal<UrlContext<RouterUrlContext, Url>> {
+        &self.url
+    }
 
     fn parse(
+        &self,
         url: UrlContext<RouterUrlContext, &str>,
     ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
         let base = UrlContext::<BrowserUrlContext, _>::new(
             window().location().origin()?,
         );
-        Self::parse_with_base(url, base.as_ref().map(|base| base.as_str()))
+        self.parse_with_base(url, base.as_ref().map(|base| base.as_str()))
     }
 
     fn parse_with_base(
+        &self,
         url: UrlContext<RouterUrlContext, &str>,
         base: UrlContext<BrowserUrlContext, &str>,
     ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
@@ -187,7 +192,7 @@ impl LocationProvider for BrowserRouter {
         };
 
         let handle_anchor_click =
-            handle_anchor_click(base, Self::parse_with_base, navigate);
+            handle_anchor_click(base, Box::new(self.clone()), navigate);
         let closure = Closure::wrap(Box::new(move |ev: Event| {
             if let Err(e) = handle_anchor_click(ev) {
                 #[cfg(feature = "tracing")]
@@ -281,7 +286,7 @@ impl LocationProvider for BrowserRouter {
         Self::scroll_to_el(loc.scroll);
     }
 
-    fn redirect(loc: &UrlContext<RouterUrlContext, &str>) {
+    fn redirect(&self, loc: &UrlContext<RouterUrlContext, &str>) {
         let navigate = use_navigate();
         let Some(url) = resolve_redirect_url(loc) else {
             return; // resolve_redirect_url() already logs an error

@@ -2,6 +2,7 @@
 
 use any_spawner::Executor;
 use core::fmt::Debug;
+use dyn_clone::DynClone;
 use js_sys::Reflect;
 use leptos::server::ServerActionError;
 use reactive_graph::{
@@ -467,14 +468,16 @@ impl Default for LocationChange {
     }
 }
 
-pub trait LocationProvider: Clone + 'static {
-    type Error: Debug;
-
+pub trait RoutingProvider: Routing + Clone {
     fn new() -> Result<Self, Self::Error>;
 
-    fn as_url(&self) -> &ArcRwSignal<UrlContext<RouterUrlContext, Url>>;
-
     fn current() -> Result<UrlContext<RouterUrlContext, Url>, Self::Error>;
+}
+
+pub trait Routing: DynClone + Send + Sync + 'static {
+    type Error: Debug;
+
+    fn as_url(&self) -> &ArcRwSignal<UrlContext<RouterUrlContext, Url>>;
 
     /// Sets up any global event listeners or other initialization needed.
     fn init(
@@ -490,20 +493,63 @@ pub trait LocationProvider: Clone + 'static {
     fn complete_navigation(&self, loc: &LocationChange);
 
     fn parse(
+        &self,
         url: UrlContext<RouterUrlContext, &str>,
     ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
-        Self::parse_with_base(url, BASE)
+        self.parse_with_base(url, BASE)
     }
 
     fn parse_with_base(
+        &self,
         url: UrlContext<RouterUrlContext, &str>,
         base: UrlContext<BrowserUrlContext, &str>,
     ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error>;
 
-    fn redirect(loc: &UrlContext<RouterUrlContext, &str>);
+    fn redirect(&self, loc: &UrlContext<RouterUrlContext, &str>);
 
     /// Whether we are currently in a "back" navigation.
     fn is_back(&self) -> ReadSignal<bool>;
+}
+
+dyn_clone::clone_trait_object!(Routing<Error = JsValue>);
+
+impl Routing for Box<dyn Routing<Error = JsValue> + '_> {
+    type Error = JsValue;
+
+    fn as_url(&self) -> &ArcRwSignal<UrlContext<RouterUrlContext, Url>> {
+        (**self).as_url()
+    }
+
+    fn init(
+        &self,
+        base: UrlContext<RouterUrlContext, Option<Cow<'static, str>>>,
+    ) {
+        (**self).init(base)
+    }
+
+    fn ready_to_complete(&self) {
+        (**self).ready_to_complete();
+    }
+
+    fn complete_navigation(&self, loc: &LocationChange) {
+        (**self).complete_navigation(loc);
+    }
+
+    fn is_back(&self) -> ReadSignal<bool> {
+        (**self).is_back()
+    }
+
+    fn parse_with_base(
+        &self,
+        url: UrlContext<RouterUrlContext, &str>,
+        base: UrlContext<BrowserUrlContext, &str>,
+    ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
+        (**self).parse_with_base(url, base)
+    }
+
+    fn redirect(&self, loc: &UrlContext<RouterUrlContext, &str>) {
+        (**self).redirect(loc);
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -540,11 +586,7 @@ where
 
 pub(crate) fn handle_anchor_click<NavFn, NavFut>(
     router_base: UrlContext<RouterUrlContext, Option<Cow<'static, str>>>,
-    parse_with_base: fn(
-        UrlContext<RouterUrlContext, &str>,
-        UrlContext<BrowserUrlContext, &str>,
-    )
-        -> Result<UrlContext<RouterUrlContext, Url>, JsValue>,
+    routing: Box<dyn Routing<Error = JsValue>>,
     navigate: NavFn,
 ) -> Box<dyn Fn(Event) -> Result<(), JsValue>>
 where
@@ -599,11 +641,12 @@ where
                 return Ok(());
             }
 
-            let url = parse_with_base(
-                UrlContext::new(href.as_str()),
-                origin.as_ref().map(|origin| origin.as_str()),
-            )
-            .unwrap();
+            let url = routing
+                .parse_with_base(
+                    UrlContext::new(href.as_str()),
+                    origin.as_ref().map(|origin| origin.as_str()),
+                )
+                .unwrap();
             let path_name =
                 UrlContext::<RouterUrlContext, Url>::unescape_minimal(
                     url.path(),
