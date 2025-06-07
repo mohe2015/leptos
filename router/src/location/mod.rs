@@ -216,10 +216,6 @@ impl<'a, C: UrlContextType, T1, T2, T3>
     }
 }
 
-pub type RouterContext<T> = UrlContext<RouterUrlContext, T>;
-
-pub type BrowserContext<T> = UrlContext<BrowserUrlContext, T>;
-
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Url {
     origin: String,
@@ -406,20 +402,20 @@ impl<C: UrlContextType> UrlContext<C, Url> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Location {
     /// The path of the URL, not containing the query string or hash fragment.
-    pub pathname: Memo<RouterContext<String>>,
+    pub pathname: Memo<UrlContext<RouterUrlContext, String>>,
     /// The raw query string.
-    pub search: Memo<RouterContext<String>>,
+    pub search: Memo<UrlContext<RouterUrlContext, String>>,
     /// The query string parsed into its key-value pairs.
-    pub query: Memo<RouterContext<ParamsMap>>,
+    pub query: Memo<UrlContext<RouterUrlContext, ParamsMap>>,
     /// The hash fragment.
-    pub hash: Memo<RouterContext<String>>,
+    pub hash: Memo<UrlContext<RouterUrlContext, String>>,
     /// The [`state`](https://developer.mozilla.org/en-US/docs/Web/API/History/state) at the top of the history stack.
     pub state: ReadSignal<State>,
 }
 
 impl Location {
     pub(crate) fn new(
-        url: impl Into<ReadSignal<RouterContext<Url>>>,
+        url: impl Into<ReadSignal<UrlContext<RouterUrlContext, Url>>>,
         state: impl Into<ReadSignal<State>>,
     ) -> Self {
         let url = url.into();
