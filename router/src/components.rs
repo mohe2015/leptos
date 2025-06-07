@@ -95,9 +95,10 @@ where
         provide_context(location.clone());
         let current_url = location.as_url().clone();
 
+        let location_clone = location.clone();
         let redirect_hook = Box::new(move |loc: &str| {
             if let Some(owner) = &owner {
-                owner.with(|| location.redirect(&UrlContext::new(loc)));
+                owner.with(|| location_clone.redirect(&UrlContext::new(loc)));
             }
         });
 

@@ -7,11 +7,13 @@ use leptos_router::{
         Routes, RoutingProgress, A,
     },
     hooks::{use_navigate, use_params, use_query_map},
+    location::{HashRouter, Routing, RoutingProvider as _},
     params::Params,
 };
 use leptos_router_macro::path;
 use std::time::Duration;
 use tracing::info;
+use wasm_bindgen::JsValue;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 struct ExampleContext(i32);
@@ -28,8 +30,7 @@ pub fn RouterExample() -> impl IntoView {
     let (is_routing, set_is_routing) = signal(false);
 
     view! {
-        <Router set_is_routing>
-            // shows a progress bar while async data are loading
+        <Router set_is_routing location=HashRouter::new().map(|v| Box::new(v) as Box<dyn Routing<Error = JsValue>>)>            // shows a progress bar while async data are loading
             <div class="routing-progress">
                 <RoutingProgress is_routing max_time=Duration::from_millis(250) />
             </div>
