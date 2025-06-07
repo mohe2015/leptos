@@ -35,7 +35,7 @@ pub fn resolve_path<'a>(
 
         let result_empty = result.as_ref().test(|result| result.is_empty());
         let prefix = if result_empty {
-            UrlContext::new("/".into())
+            UrlContext::new(RouterUrlContext, "/".into())
         } else {
             result
         };
@@ -113,27 +113,27 @@ mod tests {
     #[test]
     fn normalize_query_string_with_opening_slash() {
         assert_eq!(
-            normalize::<BrowserUrlContext>(UrlContext::new("/?foo=bar"), false),
-            UrlContext::new("?foo=bar".into())
+            normalize(UrlContext::new(BrowserUrlContext, "/?foo=bar"), false),
+            UrlContext::new(BrowserUrlContext, "?foo=bar".into())
         );
     }
 
     #[test]
     fn normalize_retain_trailing_slash() {
         assert_eq!(
-            normalize::<BrowserUrlContext>(UrlContext::new("foo/bar/"), false),
-            UrlContext::new("/foo/bar/".into())
+            normalize(UrlContext::new(BrowserUrlContext, "foo/bar/"), false),
+            UrlContext::new(BrowserUrlContext, "/foo/bar/".into())
         );
     }
 
     #[test]
     fn normalize_dedup_trailing_slashes() {
         assert_eq!(
-            normalize::<BrowserUrlContext>(
-                UrlContext::new("foo/bar/////"),
+            normalize(
+                UrlContext::new(BrowserUrlContext, "foo/bar/////"),
                 false
             ),
-            UrlContext::new("/foo/bar/".into())
+            UrlContext::new(BrowserUrlContext, "/foo/bar/".into())
         );
     }
 }

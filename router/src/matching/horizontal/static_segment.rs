@@ -14,8 +14,8 @@ impl PossibleRouteMatch for () {
     ) -> Option<PartialPathMatch<'a>> {
         Some(PartialPathMatch::new(
             path,
-            UrlContext::new(vec![]),
-            UrlContext::new(""),
+            UrlContext::new(RouterUrlContext, vec![]),
+            UrlContext::new(RouterUrlContext, ""),
         ))
     }
 
@@ -139,9 +139,9 @@ impl<T: AsPath> PossibleRouteMatch for StaticSegment<T> {
             };
         has_matched.then(|| {
             PartialPathMatch::new(
-                UrlContext::new(remaining),
-                UrlContext::new(vec![]),
-                UrlContext::new(matched),
+                UrlContext::new(RouterUrlContext, remaining),
+                UrlContext::new(RouterUrlContext, vec![]),
+                UrlContext::new(RouterUrlContext, matched),
             )
         })
     }
@@ -155,7 +155,7 @@ impl<T: AsPath> PossibleRouteMatch for StaticSegment<T> {
 mod tests {
     use super::{PossibleRouteMatch, StaticSegment};
     use crate::{
-        location::{UrlContext, UrlContexty as _},
+        location::{RouterUrlContext, UrlContext, UrlContexty as _},
         AsPath,
     };
 
@@ -181,10 +181,13 @@ mod tests {
         let path = "/foo";
         let def = StaticSegment("foo");
         let matched = def
-            .test(UrlContext::new(path))
+            .test(UrlContext::new(RouterUrlContext, path))
             .expect("couldn't match route");
-        assert_eq!(matched.matched(), UrlContext::new("/foo"));
-        assert_eq!(matched.remaining(), UrlContext::new(""));
+        assert_eq!(
+            matched.matched(),
+            UrlContext::new(RouterUrlContext, "/foo")
+        );
+        assert_eq!(matched.remaining(), UrlContext::new(RouterUrlContext, ""));
         let params = matched.params();
         assert!(params.test(|p| p.is_empty()));
     }
@@ -194,10 +197,13 @@ mod tests {
         let path = "/foo";
         let def = StaticSegment(Foo);
         let matched = def
-            .test(UrlContext::new(path))
+            .test(UrlContext::new(RouterUrlContext, path))
             .expect("couldn't match route");
-        assert_eq!(matched.matched(), UrlContext::new("/foo"));
-        assert_eq!(matched.remaining(), UrlContext::new(""));
+        assert_eq!(
+            matched.matched(),
+            UrlContext::new(RouterUrlContext, "/foo")
+        );
+        assert_eq!(matched.remaining(), UrlContext::new(RouterUrlContext, ""));
         let params = matched.params();
         assert!(params.test(|p| p.is_empty()));
     }
@@ -206,14 +212,14 @@ mod tests {
     fn single_static_mismatch() {
         let path = "/foo";
         let def = StaticSegment("bar");
-        assert!(def.test(UrlContext::new(path)).is_none());
+        assert!(def.test(UrlContext::new(RouterUrlContext, path)).is_none());
     }
 
     #[test]
     fn single_static_mismatch_on_enum() {
         let path = "/foo";
         let def = StaticSegment(Bar);
-        assert!(def.test(UrlContext::new(path)).is_none());
+        assert!(def.test(UrlContext::new(RouterUrlContext, path)).is_none());
     }
 
     #[test]
@@ -221,10 +227,13 @@ mod tests {
         let path = "/foo/";
         let def = StaticSegment("foo");
         let matched = def
-            .test(UrlContext::new(path))
+            .test(UrlContext::new(RouterUrlContext, path))
             .expect("couldn't match route");
-        assert_eq!(matched.matched(), UrlContext::new("/foo"));
-        assert_eq!(matched.remaining(), UrlContext::new("/"));
+        assert_eq!(
+            matched.matched(),
+            UrlContext::new(RouterUrlContext, "/foo")
+        );
+        assert_eq!(matched.remaining(), UrlContext::new(RouterUrlContext, "/"));
         let params = matched.params();
         assert!(params.test(|p| p.is_empty()));
     }
@@ -234,10 +243,13 @@ mod tests {
         let path = "/foo/";
         let def = StaticSegment(Foo);
         let matched = def
-            .test(UrlContext::new(path))
+            .test(UrlContext::new(RouterUrlContext, path))
             .expect("couldn't match route");
-        assert_eq!(matched.matched(), UrlContext::new("/foo"));
-        assert_eq!(matched.remaining(), UrlContext::new("/"));
+        assert_eq!(
+            matched.matched(),
+            UrlContext::new(RouterUrlContext, "/foo")
+        );
+        assert_eq!(matched.remaining(), UrlContext::new(RouterUrlContext, "/"));
         let params = matched.params();
         assert!(params.test(|p| p.is_empty()));
     }
@@ -247,10 +259,13 @@ mod tests {
         let path = "/foo/bar";
         let def = (StaticSegment("foo"), StaticSegment("bar"));
         let matched = def
-            .test(UrlContext::new(path))
+            .test(UrlContext::new(RouterUrlContext, path))
             .expect("couldn't match route");
-        assert_eq!(matched.matched(), UrlContext::new("/foo/bar"));
-        assert_eq!(matched.remaining(), UrlContext::new(""));
+        assert_eq!(
+            matched.matched(),
+            UrlContext::new(RouterUrlContext, "/foo/bar")
+        );
+        assert_eq!(matched.remaining(), UrlContext::new(RouterUrlContext, ""));
         let params = matched.params();
         assert!(params.test(|p| p.is_empty()));
     }
@@ -260,10 +275,13 @@ mod tests {
         let path = "/foo/bar";
         let def = (StaticSegment(Foo), StaticSegment(Bar));
         let matched = def
-            .test(UrlContext::new(path))
+            .test(UrlContext::new(RouterUrlContext, path))
             .expect("couldn't match route");
-        assert_eq!(matched.matched(), UrlContext::new("/foo/bar"));
-        assert_eq!(matched.remaining(), UrlContext::new(""));
+        assert_eq!(
+            matched.matched(),
+            UrlContext::new(RouterUrlContext, "/foo/bar")
+        );
+        assert_eq!(matched.remaining(), UrlContext::new(RouterUrlContext, ""));
         let params = matched.params();
         assert!(params.test(|p| p.is_empty()));
     }
@@ -273,10 +291,10 @@ mod tests {
         let path = "";
         let def = StaticSegment("");
         let matched = def
-            .test(UrlContext::new(path))
+            .test(UrlContext::new(RouterUrlContext, path))
             .expect("couldn't match route");
-        assert_eq!(matched.matched(), UrlContext::new(""));
-        assert_eq!(matched.remaining(), UrlContext::new(""));
+        assert_eq!(matched.matched(), UrlContext::new(RouterUrlContext, ""));
+        assert_eq!(matched.remaining(), UrlContext::new(RouterUrlContext, ""));
         let params = matched.params();
         assert!(params.test(|p| p.is_empty()));
     }
@@ -285,21 +303,21 @@ mod tests {
     fn tuple_static_mismatch() {
         let path = "/foo/baz";
         let def = (StaticSegment("foo"), StaticSegment("bar"));
-        assert!(def.test(UrlContext::new(path)).is_none());
+        assert!(def.test(UrlContext::new(RouterUrlContext, path)).is_none());
     }
 
     #[test]
     fn tuple_static_mismatch_on_enum() {
         let path = "/foo/baz";
         let def = (StaticSegment(Foo), StaticSegment(Bar));
-        assert!(def.test(UrlContext::new(path)).is_none());
+        assert!(def.test(UrlContext::new(RouterUrlContext, path)).is_none());
     }
 
     #[test]
     fn dont_match_smooshed_segments() {
         let path = "/foobar";
         let def = (StaticSegment(Foo), StaticSegment(Bar));
-        assert!(def.test(UrlContext::new(path)).is_none());
+        assert!(def.test(UrlContext::new(RouterUrlContext, path)).is_none());
     }
 
     #[test]
@@ -314,10 +332,13 @@ mod tests {
             (),
         );
         let matched = def
-            .test(UrlContext::new(path))
+            .test(UrlContext::new(RouterUrlContext, path))
             .expect("couldn't match route");
-        assert_eq!(matched.matched(), UrlContext::new("/foo/bar"));
-        assert_eq!(matched.remaining(), UrlContext::new(""));
+        assert_eq!(
+            matched.matched(),
+            UrlContext::new(RouterUrlContext, "/foo/bar")
+        );
+        assert_eq!(matched.remaining(), UrlContext::new(RouterUrlContext, ""));
         let params = matched.params();
         assert!(params.test(|p| p.is_empty()));
     }
@@ -334,10 +355,13 @@ mod tests {
             (),
         );
         let matched = def
-            .test(UrlContext::new(path))
+            .test(UrlContext::new(RouterUrlContext, path))
             .expect("couldn't match route");
-        assert_eq!(matched.matched(), UrlContext::new("/foo/bar"));
-        assert_eq!(matched.remaining(), UrlContext::new(""));
+        assert_eq!(
+            matched.matched(),
+            UrlContext::new(RouterUrlContext, "/foo/bar")
+        );
+        assert_eq!(matched.remaining(), UrlContext::new(RouterUrlContext, ""));
         let params = matched.params();
         assert!(params.test(|p| p.is_empty()));
     }
@@ -345,11 +369,23 @@ mod tests {
     #[test]
     fn only_match_full_static_paths() {
         let def = (StaticSegment("tests"), StaticSegment("abc"));
-        assert!(def.test(UrlContext::new("/tes/abc")).is_none());
-        assert!(def.test(UrlContext::new("/test/abc")).is_none());
-        assert!(def.test(UrlContext::new("/tes/abc/")).is_none());
-        assert!(def.test(UrlContext::new("/test/abc/")).is_none());
-        assert!(def.test(UrlContext::new("/tests/ab")).is_none());
-        assert!(def.test(UrlContext::new("/tests/ab/")).is_none());
+        assert!(def
+            .test(UrlContext::new(RouterUrlContext, "/tes/abc"))
+            .is_none());
+        assert!(def
+            .test(UrlContext::new(RouterUrlContext, "/test/abc"))
+            .is_none());
+        assert!(def
+            .test(UrlContext::new(RouterUrlContext, "/tes/abc/"))
+            .is_none());
+        assert!(def
+            .test(UrlContext::new(RouterUrlContext, "/test/abc/"))
+            .is_none());
+        assert!(def
+            .test(UrlContext::new(RouterUrlContext, "/tests/ab"))
+            .is_none());
+        assert!(def
+            .test(UrlContext::new(RouterUrlContext, "/tests/ab/"))
+            .is_none());
     }
 }

@@ -270,8 +270,9 @@ pub(crate) fn use_resolved_path(
         } else {
             router
                 .resolve_path(
-                    UrlContext::new(path.as_str()),
+                    UrlContext::new(RouterUrlContext, path.as_str()),
                     UrlContext::new(
+                        RouterUrlContext,
                         matched.as_ref().map(|n| n.get()).as_deref(),
                     ),
                 )
@@ -297,7 +298,7 @@ pub fn use_navigate() -> impl Fn(&str, NavigateOptions) + Clone {
     let cx = use_context::<RouterContext>()
         .expect("You cannot call `use_navigate` outside a <Router>.");
     move |path: &str, options: NavigateOptions| {
-        cx.navigate(UrlContext::new(path), options)
+        cx.navigate(UrlContext::new(RouterUrlContext, path), options)
     }
 }
 

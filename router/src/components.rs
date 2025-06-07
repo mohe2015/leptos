@@ -77,12 +77,13 @@ pub fn Router<Chil>(
 where
     Chil: IntoView,
 {
-    let base = UrlContext::new(base); // don't expose type to end user
+    let base = UrlContext::new(RouterUrlContext, base); // don't expose type to end user
     #[cfg(feature = "ssr")]
     let (location_provider, current_url, redirect_hook) = {
         let req = use_context::<RequestUrl>().expect("no RequestUrl provided");
         let parsed = req.parse().expect("could not parse RequestUrl");
-        let current_url = ArcRwSignal::new(UrlContext::new(parsed));
+        let current_url =
+            ArcRwSignal::new(UrlContext::new(RouterUrlContext, parsed));
 
         (None, current_url, Box::new(move |_: &str| {}))
     };
@@ -98,7 +99,10 @@ where
         let location_clone = location.clone();
         let redirect_hook = Box::new(move |loc: &str| {
             if let Some(owner) = &owner {
-                owner.with(|| location_clone.redirect(&UrlContext::new(loc)));
+                owner.with(|| {
+                    location_clone
+                        .redirect(&UrlContext::new(RouterUrlContext, loc))
+                });
             }
         });
 
@@ -154,7 +158,11 @@ impl RouterContext {
                 current.path().map(|path| Some(path)),
             )
         } else {
-            resolve_path(UrlContext::new(""), path, UrlContext::new(None))
+            resolve_path(
+                UrlContext::new(RouterUrlContext, ""),
+                path,
+                UrlContext::new(RouterUrlContext, None),
+            )
         };
 
         let mut url = match self
@@ -607,7 +615,7 @@ pub fn Redirect<P>(
 {
     // TODO resolve relative path
     // TODO here we avoid exposing the urlcontext type to the user
-    let path = UrlContext::<RouterUrlContext, _>::new(path.to_string());
+    let path = UrlContext::new(RouterUrlContext, path.to_string());
 
     // redirect on the server
     if let Some(redirect_fn) = use_context::<ServerRedirectFunction>() {

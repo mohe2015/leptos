@@ -1,4 +1,4 @@
-use crate::location::{RouterUrlContext, Url, UrlContext};
+use crate::location::{RouterUrlContext, UrlContext};
 use std::{borrow::Cow, str::FromStr, sync::Arc};
 use thiserror::Error;
 
@@ -27,9 +27,8 @@ impl ParamsMap {
     /// To replace the value instead, see [`replace`](Self::replace).
     pub fn insert(&mut self, key: impl Into<Cow<'static, str>>, value: String) {
         // TODO FIXME
-        let value = UrlContext::<RouterUrlContext, Url>::unescape(
-            UrlContext::new(&value),
-        );
+        let value =
+            UrlContext::unescape(UrlContext::new(RouterUrlContext, &value));
 
         let key = key.into();
         if let Some(prev) = self.0.iter_mut().find(|(k, _)| k == &key) {
@@ -50,9 +49,8 @@ impl ParamsMap {
         value: String,
     ) {
         // TODO FIXME
-        let value = UrlContext::<RouterUrlContext, Url>::unescape(
-            UrlContext::new(&value),
-        );
+        let value =
+            UrlContext::unescape(UrlContext::new(RouterUrlContext, &value));
 
         let key = key.into();
         if let Some(prev) = self.0.iter_mut().find(|(k, _)| k == &key) {
@@ -110,16 +108,18 @@ impl ParamsMap {
                 for v in vs {
                     // TODO FIXME
                     buf.push_str(
-                        &UrlContext::<RouterUrlContext, Url>::escape(
-                            UrlContext::new(k),
-                        )
+                        &UrlContext::escape(UrlContext::new(
+                            RouterUrlContext,
+                            k,
+                        ))
                         .forget_context(RouterUrlContext),
                     );
                     buf.push('=');
                     buf.push_str(
-                        &UrlContext::<RouterUrlContext, Url>::escape(
-                            UrlContext::new(v),
-                        )
+                        &UrlContext::escape(UrlContext::new(
+                            RouterUrlContext,
+                            v,
+                        ))
                         .forget_context(RouterUrlContext),
                     );
                     buf.push('&');

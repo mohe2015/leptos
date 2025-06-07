@@ -40,7 +40,7 @@ where
 impl<Children> RouteDefs<Children> {
     pub fn new(children: Children) -> Self {
         Self {
-            base: UrlContext::new(None),
+            base: UrlContext::new(RouterUrlContext, None),
             children,
         }
     }
@@ -178,8 +178,9 @@ pub struct GeneratedRouteData {
 mod tests {
     use super::{NestedRoute, ParamSegment, RouteDefs};
     use crate::{
-        location::UrlContext, matching::MatchParams, MatchInterface,
-        PathSegment, StaticSegment, WildcardSegment,
+        location::{RouterUrlContext, UrlContext},
+        matching::MatchParams,
+        MatchInterface, PathSegment, StaticSegment, WildcardSegment,
     };
     use either_of::{Either, EitherOf4};
 
@@ -187,12 +188,13 @@ mod tests {
     pub fn matches_single_root_route() {
         let routes =
             RouteDefs::<_>::new(NestedRoute::new(StaticSegment("/"), || ()));
-        let matched = routes.match_route(UrlContext::new("/"));
+        let matched =
+            routes.match_route(UrlContext::new(RouterUrlContext, "/"));
         assert!(matched.is_some());
         // this case seems like it should match, but implementing it interferes with
         // handling trailing slash requirements accurately -- paths for the root are "/",
         // not "", in any case
-        let matched = routes.match_route(UrlContext::new(""));
+        let matched = routes.match_route(UrlContext::new(RouterUrlContext, ""));
         assert!(matched.is_none());
         let (base, paths) = routes.generate_routes();
         assert_eq!(base, None);
@@ -225,7 +227,7 @@ mod tests {
         );
 
         let matched = routes
-            .match_route(UrlContext::new("/author/contact"))
+            .match_route(UrlContext::new(RouterUrlContext, "/author/contact"))
             .unwrap();
         assert_eq!(MatchInterface::as_matched(&matched), "");
         let (_, child) = MatchInterface::into_view_and_child(matched);
@@ -241,7 +243,9 @@ mod tests {
             NestedRoute::new(StaticSegment("/property-api"), || ()),
             NestedRoute::new(StaticSegment("/property"), || ()),
         ));
-        let matched = routes.match_route(UrlContext::new("/property")).unwrap();
+        let matched = routes
+            .match_route(UrlContext::new(RouterUrlContext, "/property"))
+            .unwrap();
         assert!(matches!(matched, Either::Right(_)));
     }
 
@@ -255,7 +259,8 @@ mod tests {
                 ),
             ),
         );
-        let matched = routes.match_route(UrlContext::new("/"));
+        let matched =
+            routes.match_route(UrlContext::new(RouterUrlContext, "/"));
         assert!(matched.is_none());
     }
 
@@ -302,14 +307,18 @@ mod tests {
             ]
         );
 
-        let matched = routes.match_route(UrlContext::new("/about")).unwrap();
-        let params = matched.to_params();
-        assert!(params.is_empty());
-        let matched = routes.match_route(UrlContext::new("/blog")).unwrap();
+        let matched = routes
+            .match_route(UrlContext::new(RouterUrlContext, "/about"))
+            .unwrap();
         let params = matched.to_params();
         assert!(params.is_empty());
         let matched = routes
-            .match_route(UrlContext::new("/blog/post/42"))
+            .match_route(UrlContext::new(RouterUrlContext, "/blog"))
+            .unwrap();
+        let params = matched.to_params();
+        assert!(params.is_empty());
+        let matched = routes
+            .match_route(UrlContext::new(RouterUrlContext, "/blog/post/42"))
             .unwrap();
         let params = matched.to_params();
         assert_eq!(params, vec![("id".into(), "42".into())]);
@@ -336,36 +345,46 @@ mod tests {
                     || (),
                 ),
             ),
-            UrlContext::new("/portfolio"),
+            UrlContext::new(RouterUrlContext, "/portfolio"),
         );
 
         // generates routes correctly
         let (base, _paths) = routes.generate_routes();
         assert_eq!(base, Some("/portfolio"));
 
-        let matched = routes.match_route(UrlContext::new("/about"));
+        let matched =
+            routes.match_route(UrlContext::new(RouterUrlContext, "/about"));
         assert!(matched.is_none());
 
         let matched = routes
-            .match_route(UrlContext::new("/portfolio/about"))
+            .match_route(UrlContext::new(RouterUrlContext, "/portfolio/about"))
             .unwrap();
         let params = matched.to_params();
         assert!(params.is_empty());
 
         let matched = routes
-            .match_route(UrlContext::new("/portfolio/blog/post/42"))
+            .match_route(UrlContext::new(
+                RouterUrlContext,
+                "/portfolio/blog/post/42",
+            ))
             .unwrap();
         let params = matched.to_params();
         assert_eq!(params, vec![("id".into(), "42".into())]);
 
         let matched = routes
-            .match_route(UrlContext::new("/portfolio/contact"))
+            .match_route(UrlContext::new(
+                RouterUrlContext,
+                "/portfolio/contact",
+            ))
             .unwrap();
         let params = matched.to_params();
         assert_eq!(params, vec![("any".into(), "".into())]);
 
         let matched = routes
-            .match_route(UrlContext::new("/portfolio/contact/foobar"))
+            .match_route(UrlContext::new(
+                RouterUrlContext,
+                "/portfolio/contact/foobar",
+            ))
             .unwrap();
         let params = matched.to_params();
         assert_eq!(params, vec![("any".into(), "foobar".into())]);
@@ -383,13 +402,16 @@ mod tests {
             NestedRoute::new(WildcardSegment("any"), || ()),
         ));
 
-        let matched = routes.match_route(UrlContext::new("/users"));
+        let matched =
+            routes.match_route(UrlContext::new(RouterUrlContext, "/users"));
         assert!(matches!(matched, Some(EitherOf4::B(..))));
 
-        let matched = routes.match_route(UrlContext::new("/users/id"));
+        let matched =
+            routes.match_route(UrlContext::new(RouterUrlContext, "/users/id"));
         assert!(matches!(matched, Some(EitherOf4::C(..))));
 
-        let matched = routes.match_route(UrlContext::new("/usersid"));
+        let matched =
+            routes.match_route(UrlContext::new(RouterUrlContext, "/usersid"));
         assert!(matches!(matched, Some(EitherOf4::D(..))));
     }
 }

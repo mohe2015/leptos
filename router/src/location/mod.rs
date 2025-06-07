@@ -12,7 +12,7 @@ use reactive_graph::{
     traits::With,
 };
 use send_wrapper::SendWrapper;
-use std::{borrow::Cow, future::Future, marker::PhantomData};
+use std::{borrow::Cow, future::Future, marker::PhantomData, sync::LazyLock};
 use tachys::dom::window;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{Event, HtmlAnchorElement, MouseEvent};
@@ -25,8 +25,8 @@ pub use hash::*;
 pub use history::*;
 pub use server::*;
 
-pub(crate) const BASE: UrlContext<BrowserUrlContext, &str> =
-    UrlContext::new("https://leptos.dev");
+pub(crate) static BASE: LazyLock<UrlContext<BrowserUrlContext, &'static str>> =
+    LazyLock::new(|| UrlContext::new(BrowserUrlContext, "https://leptos.dev"));
 
 pub trait UrlContextType {
     fn produce_from_thin_air() -> Self;
@@ -60,7 +60,7 @@ impl<C: UrlContextType, T> UrlContext<C, UrlContext<C, T>> {
 }
 
 impl<C: UrlContextType, T> UrlContext<C, T> {
-    pub const fn new(value: T) -> Self {
+    pub fn new(_context: C, value: T) -> Self {
         Self(value, PhantomData)
     }
 
@@ -498,7 +498,7 @@ pub trait Routing: DynClone + Send + Sync + 'static {
         &self,
         url: UrlContext<RouterUrlContext, &str>,
     ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
-        self.parse_with_base(url, BASE)
+        self.parse_with_base(url, *BASE)
     }
 
     fn parse_with_base(
@@ -601,9 +601,8 @@ where
 
     Box::new(move |ev: Event| {
         let ev = ev.unchecked_into::<MouseEvent>();
-        let origin = UrlContext::<BrowserUrlContext, _>::new(
-            window().location().origin()?,
-        );
+        let origin =
+            UrlContext::new(BrowserUrlContext, window().location().origin()?);
         if ev.default_prevented()
             || ev.button() != 0
             || ev.meta_key()
@@ -645,7 +644,8 @@ where
 
             let url = routing
                 .parse_with_base(
-                    UrlContext::new(href.as_str()),
+                    // TODO FIXME context is wrong
+                    UrlContext::new(RouterUrlContext, href.as_str()),
                     origin.as_ref().map(|origin| origin.as_str()),
                 )
                 .unwrap();

@@ -80,19 +80,23 @@ impl RoutingProvider for HashRouter {
 
     fn current() -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
         let location = window().location();
-        Ok(UrlContext::new(Url {
-            origin: location.origin()?,
-            path: location.pathname()?,
-            search: location
-                .search()?
-                .strip_prefix('?')
-                .map(String::from)
-                .unwrap_or_default(),
-            search_params: search_params_from_web_url(
-                &UrlSearchParams::new_with_str(&location.search()?)?,
-            )?,
-            hash: location.hash()?,
-        }))
+        Ok(UrlContext::new(
+            RouterUrlContext,
+            // TODO FIXME
+            Url {
+                origin: location.origin()?,
+                path: location.pathname()?,
+                search: location
+                    .search()?
+                    .strip_prefix('?')
+                    .map(String::from)
+                    .unwrap_or_default(),
+                search_params: search_params_from_web_url(
+                    &UrlSearchParams::new_with_str(&location.search()?)?,
+                )?,
+                hash: location.hash()?,
+            },
+        ))
     }
 }
 
@@ -107,9 +111,8 @@ impl Routing for HashRouter {
         &self,
         url: UrlContext<RouterUrlContext, &str>,
     ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
-        let base = UrlContext::<BrowserUrlContext, _>::new(
-            window().location().origin()?,
-        );
+        let base =
+            UrlContext::new(BrowserUrlContext, window().location().origin()?);
         self.parse_with_base(url, base.as_ref().map(|base| base.as_str()))
     }
 
@@ -291,9 +294,8 @@ impl Routing for HashRouter {
         let Some(url) = resolve_redirect_url(loc) else {
             return; // resolve_redirect_url() already logs an error
         };
-        let current_origin = UrlContext::<BrowserUrlContext, _>::new(
-            location().origin().unwrap(),
-        );
+        let current_origin =
+            UrlContext::new(BrowserUrlContext, location().origin().unwrap());
         if url.as_ref().map(|url| url.origin())
             == current_origin.change_context(BrowserUrlContext)
         {

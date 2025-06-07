@@ -169,6 +169,7 @@ where
                                         .unwrap()
                                         .parse(UrlContext::new(
                                             // TODO FIXME
+                                            RouterUrlContext,
                                             resp_url.as_str(),
                                         )) {
                                         Ok(url) => {
@@ -262,7 +263,10 @@ where
                                         .unwrap()
                                         .parse(
                                             // TODO FIXME
-                                            UrlContext::new(resp_url.as_str()),
+                                            UrlContext::new(
+                                                RouterUrlContext,
+                                                resp_url.as_str(),
+                                            ),
                                         ) {
                                         Ok(url) => {
                                             if url.origin()
@@ -329,6 +333,8 @@ where
                     if let Some(navigate) = navigate {
                         navigate(
                             UrlContext::new(
+                                // TODO FIXME
+                                RouterUrlContext,
                                 format!("{action}?{params}").as_str(),
                             )
                             .forget_context(RouterUrlContext),
@@ -382,13 +388,16 @@ fn current_window_origin() -> UrlContext<BrowserUrlContext, String> {
     let protocol = location.protocol().unwrap_or_default();
     let hostname = location.hostname().unwrap_or_default();
     let port = location.port().unwrap_or_default();
-    UrlContext::new(format!(
-        "{}//{}{}{}",
-        protocol,
-        hostname,
-        if port.is_empty() { "" } else { ":" },
-        port
-    ))
+    UrlContext::new(
+        BrowserUrlContext,
+        format!(
+            "{}//{}{}{}",
+            protocol,
+            hostname,
+            if port.is_empty() { "" } else { ":" },
+            port
+        ),
+    )
 }
 
 fn extract_form_attributes(
