@@ -1,5 +1,8 @@
 use super::{Url, BASE};
-use crate::params::ParamsMap;
+use crate::{
+    location::{BrowserUrlContext, UrlContext, UrlContexty as _},
+    params::ParamsMap,
+};
 use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -26,11 +29,15 @@ impl Default for RequestUrl {
 
 impl RequestUrl {
     pub fn parse(&self) -> Result<Url, url::ParseError> {
-        self.parse_with_base(BASE)
+        self.parse_with_base(&BASE)
     }
 
-    pub fn parse_with_base(&self, base: &str) -> Result<Url, url::ParseError> {
-        let base = url::Url::parse(base)?;
+    pub fn parse_with_base(
+        &self,
+        base: &UrlContext<BrowserUrlContext, &str>,
+    ) -> Result<Url, url::ParseError> {
+        let base =
+            url::Url::parse(base.as_ref().forget_context(BrowserUrlContext))?;
         let url = url::Url::options().base_url(Some(&base)).parse(&self.0)?;
 
         let search_params = url

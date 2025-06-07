@@ -1,14 +1,17 @@
 use crate::{
     components::RouterContext,
-    location::{Location, Url},
+    location::{Location, RouterUrlContext, Url, UrlContext, UrlContexty as _},
     navigate::NavigateOptions,
     params::{Params, ParamsError, ParamsMap},
 };
-use leptos::{leptos_dom::helpers::request_animation_frame, oco::Oco};
+use leptos::{
+    leptos_dom::helpers::request_animation_frame,
+    oco::Oco,
+    prelude::{ArcMappedSignal, Signal},
+};
 use reactive_graph::{
     computed::{ArcMemo, Memo},
     owner::{expect_context, use_context},
-    signal::{ArcRwSignal, ReadSignal},
     traits::{Get, GetUntracked, ReadUntracked, With, WriteValue},
     wrappers::write::SignalSetter,
 };
@@ -123,8 +126,13 @@ where
     let set = SignalSetter::map(move |value: Option<T>| {
         let path = location.pathname.get_untracked();
         let hash = location.hash.get_untracked();
-        let qs = location.query.read_untracked().to_query_string();
-        let new_url = format!("{path}{qs}{hash}");
+        let qs = location
+            .query
+            .read_untracked()
+            .as_ref()
+            .map(|q| q.to_query_string());
+        let new_url = (path, qs, hash)
+            .map(|(path, qs, hash)| format!("{path}{qs}{hash}"));
         query_mutations
             .write_value()
             .push((key.clone(), value.as_ref().map(ToString::to_string)));
@@ -135,7 +143,13 @@ where
                 let navigate = navigate.clone();
                 let nav_options = nav_options.clone();
                 move || {
-                    navigate(&new_url, nav_options.clone());
+                    navigate(
+                        new_url
+                            .as_ref()
+                            .map(|u| u.as_str())
+                            .forget_context(RouterUrlContext),
+                        nav_options.clone(),
+                    );
                     IS_NAVIGATING.store(false, Ordering::Relaxed)
                 }
             })
@@ -201,19 +215,23 @@ where
 }
 
 #[track_caller]
-fn use_url_raw() -> ArcRwSignal<Url> {
+fn use_url_raw() -> ArcMappedSignal<Url> {
     use_context().unwrap_or_else(|| {
         let RouterContext { current_url, .. } = use_context().expect(
             "Tried to access reactive URL outside a <Router> component.",
         );
-        current_url
+        ArcMappedSignal::new(
+            current_url,
+            |a| a.as_ref().forget_context(RouterUrlContext),
+            |a| a.as_mut().forget_context(RouterUrlContext),
+        )
     })
 }
 
 /// Gives reactive access to the current URL.
 #[track_caller]
-pub fn use_url() -> ReadSignal<Url> {
-    use_url_raw().read_only().into()
+pub fn use_url() -> Signal<Url> {
+    use_url_raw().into()
 }
 
 /// Returns a raw key-value map of the URL search query.
@@ -252,9 +270,12 @@ pub(crate) fn use_resolved_path(
         } else {
             router
                 .resolve_path(
-                    &path,
-                    matched.as_ref().map(|n| n.get()).as_deref(),
+                    UrlContext::new(path.as_str()),
+                    UrlContext::new(
+                        matched.as_ref().map(|n| n.get()).as_deref(),
+                    ),
                 )
+                .forget_context(RouterUrlContext)
                 .to_string()
         }
     })
@@ -275,7 +296,9 @@ pub(crate) fn use_resolved_path(
 pub fn use_navigate() -> impl Fn(&str, NavigateOptions) + Clone {
     let cx = use_context::<RouterContext>()
         .expect("You cannot call `use_navigate` outside a <Router>.");
-    move |path: &str, options: NavigateOptions| cx.navigate(path, options)
+    move |path: &str, options: NavigateOptions| {
+        cx.navigate(UrlContext::new(path), options)
+    }
 }
 
 /// Returns a reactive string that contains the route that was matched for

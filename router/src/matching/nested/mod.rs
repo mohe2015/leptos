@@ -2,7 +2,10 @@ use super::{
     IntoChooseViewMaybeErased, MatchInterface, MatchNestedRoutes,
     PartialPathMatch, PathSegment, PossibleRouteMatch, RouteMatchId,
 };
-use crate::{ChooseView, GeneratedRouteData, MatchParams, Method, SsrMode};
+use crate::{
+    location::{RouterUrlContext, UrlContext, UrlContexty},
+    ChooseView, GeneratedRouteData, MatchParams, Method, SsrMode,
+};
 use core::{fmt, iter};
 use either_of::Either;
 use std::{
@@ -203,8 +206,11 @@ where
 
     fn match_nested<'a>(
         &'a self,
-        path: &'a str,
-    ) -> (Option<(RouteMatchId, Self::Match)>, &'a str) {
+        path: UrlContext<RouterUrlContext, &'a str>,
+    ) -> (
+        Option<(RouteMatchId, Self::Match)>,
+        UrlContext<RouterUrlContext, &'a str>,
+    ) {
         // if this was optional (for example, this whole nested route definition consisted of an optional param),
         // then we'll need to retest the inner value against the starting path, if this one succeeds and the inner one fails
         let this_was_optional = self.segments.optional();
@@ -254,8 +260,12 @@ where
                             .as_ref()
                             .map(|inner| inner.as_matched())
                             .unwrap_or("");
-                        let rematch = path
-                            .trim_end_matches(&format!("{matched}{remaining}"));
+                        let rematch =
+                            (path, remaining).map(|(path, remaining)| {
+                                path.trim_end_matches(&format!(
+                                    "{matched}{remaining}"
+                                ))
+                            });
                         let new_partial = self.segments.test(rematch).unwrap();
                         params = new_partial.params;
                     }
@@ -267,15 +277,20 @@ where
 
                     let id = RouteMatchId(self.id);
 
-                    if remaining.is_empty() || remaining == "/" {
-                        params.extend(inner_params);
+                    if remaining.test(|remaining| {
+                        remaining.is_empty() || remaining == "/"
+                    }) {
+                        params.map_mut(|params| params.extend(inner_params));
                         Some((
                             Some((
                                 id,
                                 NestedMatch {
                                     id,
-                                    matched: matched.to_string(),
-                                    params,
+                                    matched: matched
+                                        .forget_context(RouterUrlContext)
+                                        .to_string(),
+                                    params: params
+                                        .forget_context(RouterUrlContext),
                                     child: inner,
                                     view_fn: self.view.clone(),
                                 },

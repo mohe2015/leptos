@@ -1,3 +1,5 @@
+use crate::location::{RouterUrlContext, UrlContext, UrlContexty as _};
+
 use super::{PartialPathMatch, PathSegment, PossibleRouteMatch};
 
 macro_rules! tuples {
@@ -14,7 +16,7 @@ macro_rules! tuples {
                 [$first.optional(), $($ty.optional()),*].into_iter().any(|n| n)
             }
 
-            fn test<'a>(&self, path: &'a str) -> Option<PartialPathMatch<'a>> {
+            fn test<'a>(&self, path: UrlContext<RouterUrlContext, &'a str>) -> Option<PartialPathMatch<'a>> {
                 #[allow(non_snake_case)]
                 let ($first, $($ty,)*) = &self;
 
@@ -28,7 +30,7 @@ macro_rules! tuples {
                     let mut matched_len = 0;
                     let mut r = path;
 
-                    let mut p = Vec::new();
+                    let mut p = UrlContext::new(Vec::new());
                     let mut m = String::new();
 
                     if $first.optional() {
@@ -40,8 +42,8 @@ macro_rules! tuples {
                                 return None;
                             },
                             Some(PartialPathMatch { remaining, matched, params }) => {
-                                p.extend(params.into_iter());
-                                m.push_str(matched);
+                                (p.map_mut(|p| p), params).map(|(p, params)| p.extend(params.into_iter()));
+                                m.push_str(matched.forget_context(RouterUrlContext));
                                 r = remaining;
                             },
                         }
@@ -70,13 +72,13 @@ macro_rules! tuples {
                                 Some(v) => v,
                             };
                             r = remaining;
-                            matched_len += matched.len();
-                            p.extend(params);
+                            matched_len += matched.forget_context(RouterUrlContext).len();
+                            (p.map_mut(|p| p), params).map(|(p, params)| p.extend(params.into_iter()));
                         }
                     )*
                     return Some(PartialPathMatch {
                         remaining: r,
-                        matched: &path[0..matched_len],
+                        matched: path.map(|path| &path[0..matched_len]),
                         params: p
                     });
                 }
@@ -103,7 +105,10 @@ where
         self.0.optional()
     }
 
-    fn test<'a>(&self, path: &'a str) -> Option<PartialPathMatch<'a>> {
+    fn test<'a>(
+        &self,
+        path: UrlContext<RouterUrlContext, &'a str>,
+    ) -> Option<PartialPathMatch<'a>> {
         let remaining = path;
         let PartialPathMatch {
             remaining,
@@ -112,7 +117,8 @@ where
         } = self.0.test(remaining)?;
         Some(PartialPathMatch {
             remaining,
-            matched: &path[0..matched.len()],
+            matched: (path, matched)
+                .map(|(path, matched)| &path[0..matched.len()]),
             params,
         })
     }

@@ -6,7 +6,8 @@ use crate::{
     flat_router::FlatRoutesView,
     hooks::use_navigate,
     location::{
-        BrowserUrl, Location, LocationChange, LocationProvider, State, Url,
+        BrowserRouter, Location, LocationChange, LocationProvider,
+        RouterUrlContext, State, Url, UrlContext, UrlContexty as _,
     },
     navigate::NavigateOptions,
     nested_router::NestedRoutesView,
@@ -71,11 +72,12 @@ pub fn Router<Chil>(
 where
     Chil: IntoView,
 {
+    let base = UrlContext::new(base); // don't expose type to end user
     #[cfg(feature = "ssr")]
     let (location_provider, current_url, redirect_hook) = {
         let req = use_context::<RequestUrl>().expect("no RequestUrl provided");
         let parsed = req.parse().expect("could not parse RequestUrl");
-        let current_url = ArcRwSignal::new(parsed);
+        let current_url = ArcRwSignal::new(UrlContext::new(parsed));
 
         (None, current_url, Box::new(move |_: &str| {}))
     };
@@ -84,14 +86,14 @@ where
     let (location_provider, current_url, redirect_hook) = {
         let owner = Owner::current();
         let location =
-            BrowserUrl::new().expect("could not access browser navigation"); // TODO options here
+            BrowserRouter::new().expect("could not access browser navigation"); // TODO options here
         location.init(base.clone());
         provide_context(location.clone());
         let current_url = location.as_url().clone();
 
         let redirect_hook = Box::new(move |loc: &str| {
             if let Some(owner) = &owner {
-                owner.with(|| BrowserUrl::redirect(loc));
+                owner.with(|| BrowserRouter::redirect(&UrlContext::new(loc)));
             }
         });
 
@@ -120,56 +122,72 @@ where
 
 #[derive(Clone)]
 pub(crate) struct RouterContext {
-    pub base: Option<Cow<'static, str>>,
-    pub current_url: ArcRwSignal<Url>,
+    pub base: UrlContext<RouterUrlContext, Option<Cow<'static, str>>>,
+    pub current_url: ArcRwSignal<UrlContext<RouterUrlContext, Url>>,
     pub location: Location,
     pub state: ArcRwSignal<State>,
     pub set_is_routing: Option<SignalSetter<bool>>,
     pub query_mutations:
         ArcStoredValue<Vec<(Oco<'static, str>, Option<String>)>>,
-    pub location_provider: Option<BrowserUrl>,
+    pub location_provider: Option<BrowserRouter>,
 }
 
 impl RouterContext {
-    pub fn navigate(&self, path: &str, options: NavigateOptions) {
+    pub fn navigate(
+        &self,
+        path: UrlContext<RouterUrlContext, &str>,
+        options: NavigateOptions,
+    ) {
         let current = self.current_url.read_untracked();
         let resolved_to = if options.resolve {
             resolve_path(
-                self.base.as_deref().unwrap_or_default(),
+                self.base
+                    .as_ref()
+                    .map(|base| base.as_deref().unwrap_or_default()),
                 path,
                 // TODO this should be relative to the current *Route*, I think...
-                Some(current.path()),
+                current.path().map(|path| Some(path)),
             )
         } else {
-            resolve_path("", path, None)
+            resolve_path(UrlContext::new(""), path, UrlContext::new(None))
         };
 
-        let mut url = match BrowserUrl::parse(&resolved_to) {
-            Ok(url) => url,
-            Err(e) => {
-                leptos::logging::error!("Error parsing URL: {e:?}");
-                return;
-            }
-        };
+        let mut url =
+            match BrowserRouter::parse(resolved_to.as_ref().map(|r| &**r)) {
+                Ok(url) => url,
+                Err(e) => {
+                    leptos::logging::error!("Error parsing URL: {e:?}");
+                    return;
+                }
+            };
         let query_mutations =
             mem::take(&mut *self.query_mutations.write_value());
         if !query_mutations.is_empty() {
             for (key, value) in query_mutations {
                 if let Some(value) = value {
-                    url.search_params_mut().replace(key, value);
+                    url.search_params_mut()
+                        .map(|s| s.replace(key.clone(), value.clone()));
                 } else {
-                    url.search_params_mut().remove(&key);
+                    url.search_params_mut().map(|s| s.remove(&key));
                 }
             }
-            *url.search_mut() = url
+            let new_value = url
                 .search_params()
-                .to_query_string()
-                .trim_start_matches('?')
-                .into()
+                .map_mut(|s| {
+                    s.to_query_string().trim_start_matches('?').to_string()
+                })
+                .forget_context(RouterUrlContext)
+                .clone();
+            url.search_mut().map(move |s| {
+                *s = new_value;
+            });
         }
 
         if url.origin() != current.origin() {
-            window().location().set_href(path).unwrap();
+            window()
+                .location()
+                .set_href(path.forget_context(RouterUrlContext))
+                .unwrap();
             return;
         }
 
@@ -197,10 +215,13 @@ impl RouterContext {
 
     pub fn resolve_path<'a>(
         &'a self,
-        path: &'a str,
-        from: Option<&'a str>,
-    ) -> Cow<'a, str> {
-        let base = self.base.as_deref().unwrap_or_default();
+        path: UrlContext<RouterUrlContext, &'a str>,
+        from: UrlContext<RouterUrlContext, Option<&'a str>>,
+    ) -> UrlContext<RouterUrlContext, Cow<'a, str>> {
+        let base = self
+            .base
+            .as_ref()
+            .map(|base| base.as_deref().unwrap_or_default());
         resolve_path(base, path, from)
     }
 }
@@ -231,7 +252,7 @@ where
     FallbackFn: FnOnce() -> Fallback + Clone + Send + 'static,
     Fallback: IntoView + 'static,
 {
-    let location = use_context::<BrowserUrl>();
+    let location = use_context::<BrowserRouter>();
     let RouterContext {
         current_url,
         base,
@@ -240,13 +261,15 @@ where
     } = use_context()
         .expect("<Routes> should be used inside a <Router> component");
     let base = base.map(|base| {
-        let mut base = Oco::from(base);
-        base.upgrade_inplace();
-        base
+        base.map(|base| {
+            let mut base = Oco::from(base);
+            base.upgrade_inplace();
+            base
+        })
     });
     let routes = RouteDefs::new_with_base(
         children.into_inner(),
-        base.clone().unwrap_or_default(),
+        base.clone().map(|v| v.unwrap_or_default()),
     );
     let outer_owner =
         Owner::current().expect("creating Routes, but no Owner was found");
@@ -260,7 +283,7 @@ where
             routes: routes.clone(),
             outer_owner: outer_owner.clone(),
             current_url: current_url.clone(),
-            base: base.clone(),
+            base: base.clone().forget_context(RouterUrlContext),
             fallback: fallback.clone(),
             set_is_routing,
             transition,
@@ -284,7 +307,7 @@ where
     FallbackFn: FnOnce() -> Fallback + Clone + Send + 'static,
     Fallback: IntoView + 'static,
 {
-    let location = use_context::<BrowserUrl>();
+    let location = use_context::<BrowserRouter>();
     let RouterContext {
         current_url,
         base,
@@ -296,13 +319,15 @@ where
     // TODO base
     #[allow(unused)]
     let base = base.map(|base| {
-        let mut base = Oco::from(base);
-        base.upgrade_inplace();
-        base
+        base.map(|base| {
+            let mut base = Oco::from(base);
+            base.upgrade_inplace();
+            base
+        })
     });
     let routes = RouteDefs::new_with_base(
         children.into_inner(),
-        base.clone().unwrap_or_default(),
+        base.map(|v| v.unwrap_or_default()),
     );
 
     let outer_owner =
@@ -572,11 +597,12 @@ pub fn Redirect<P>(
     P: core::fmt::Display + 'static,
 {
     // TODO resolve relative path
-    let path = path.to_string();
+    // TODO here we avoid exposing the urlcontext type to the user
+    let path = UrlContext::<RouterUrlContext, _>::new(path.to_string());
 
     // redirect on the server
     if let Some(redirect_fn) = use_context::<ServerRedirectFunction>() {
-        (redirect_fn.f)(&path);
+        (redirect_fn.f)(&path.as_ref().map(|path| path.as_str()));
     }
     // redirect on the client
     else {
@@ -595,7 +621,12 @@ pub fn Redirect<P>(
             return;
         }
         let navigate = use_navigate();
-        navigate(&path, options.unwrap_or_default());
+        navigate(
+            path.as_ref()
+                .map(|path| path.as_str())
+                .forget_context(RouterUrlContext),
+            options.unwrap_or_default(),
+        );
     }
 }
 
@@ -604,7 +635,7 @@ pub fn Redirect<P>(
 /// and [`Redirect`].
 #[derive(Clone)]
 pub struct ServerRedirectFunction {
-    f: Arc<dyn Fn(&str) + Send + Sync>,
+    f: Arc<dyn Fn(&UrlContext<RouterUrlContext, &str>) + Send + Sync>,
 }
 
 impl core::fmt::Debug for ServerRedirectFunction {
@@ -618,7 +649,9 @@ impl core::fmt::Debug for ServerRedirectFunction {
 /// appropriate `Location` header.
 pub fn provide_server_redirect(handler: impl Fn(&str) + Send + Sync + 'static) {
     provide_context(ServerRedirectFunction {
-        f: Arc::new(handler),
+        f: Arc::new(move |param| {
+            handler(param.forget_context(RouterUrlContext))
+        }),
     })
 }
 

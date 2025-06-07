@@ -1,5 +1,8 @@
 use super::{MatchInterface, MatchNestedRoutes, PathSegment, RouteMatchId};
-use crate::{ChooseView, GeneratedRouteData, MatchParams};
+use crate::{
+    location::{RouterUrlContext, UrlContext},
+    ChooseView, GeneratedRouteData, MatchParams,
+};
 use core::iter;
 use either_of::*;
 use std::borrow::Cow;
@@ -37,8 +40,11 @@ impl MatchNestedRoutes for () {
 
     fn match_nested<'a>(
         &self,
-        path: &'a str,
-    ) -> (Option<(RouteMatchId, Self::Match)>, &'a str) {
+        path: UrlContext<RouterUrlContext, &'a str>,
+    ) -> (
+        Option<(RouteMatchId, Self::Match)>,
+        UrlContext<RouterUrlContext, &'a str>,
+    ) {
         (Some((RouteMatchId(0), ())), path)
     }
 
@@ -89,8 +95,11 @@ where
 
     fn match_nested<'a>(
         &'a self,
-        path: &'a str,
-    ) -> (Option<(RouteMatchId, Self::Match)>, &'a str) {
+        path: UrlContext<RouterUrlContext, &'a str>,
+    ) -> (
+        Option<(RouteMatchId, Self::Match)>,
+        UrlContext<RouterUrlContext, &'a str>,
+    ) {
         self.0.match_nested(path)
     }
 
@@ -163,8 +172,11 @@ where
 
     fn match_nested<'a>(
         &'a self,
-        path: &'a str,
-    ) -> (Option<(RouteMatchId, Self::Match)>, &'a str) {
+        path: UrlContext<RouterUrlContext, &'a str>,
+    ) -> (
+        Option<(RouteMatchId, Self::Match)>,
+        UrlContext<RouterUrlContext, &'a str>,
+    ) {
         #[allow(non_snake_case)]
         let (A, B) = &self;
         if let (Some((id, matched)), remaining) = A.match_nested(path) {
@@ -203,8 +215,11 @@ where
 
     fn match_nested<'a>(
         &'a self,
-        path: &'a str,
-    ) -> (Option<(RouteMatchId, Self::Match)>, &'a str) {
+        path: UrlContext<RouterUrlContext, &'a str>,
+    ) -> (
+        Option<(RouteMatchId, Self::Match)>,
+        UrlContext<RouterUrlContext, &'a str>,
+    ) {
         for item in self.iter() {
             if let (Some((id, matched)), remaining) = item.match_nested(path) {
                 return (Some((id, matched)), remaining);
@@ -296,7 +311,7 @@ macro_rules! tuples {
                 true
             }
 
-            fn match_nested<'a>(&'a self, path: &'a str) -> (Option<(RouteMatchId, Self::Match)>, &'a str) {
+            fn match_nested<'a>(&'a self, path: UrlContext<RouterUrlContext, &'a str>) -> (Option<(RouteMatchId, Self::Match)>, UrlContext<RouterUrlContext, &'a str>) {
                 #[allow(non_snake_case)]
 
                 let ($($ty,)*) = &self;

@@ -11,7 +11,7 @@ use reactive_graph::{
     traits::With,
 };
 use send_wrapper::SendWrapper;
-use std::{borrow::Cow, future::Future};
+use std::{borrow::Cow, future::Future, marker::PhantomData};
 use tachys::dom::window;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{Event, HtmlAnchorElement, MouseEvent};
@@ -22,7 +22,199 @@ use crate::params::ParamsMap;
 pub use history::*;
 pub use server::*;
 
-pub(crate) const BASE: &str = "https://leptos.dev";
+pub(crate) const BASE: UrlContext<BrowserUrlContext, &str> =
+    UrlContext::new("https://leptos.dev");
+
+pub trait UrlContextType {
+    fn produce_from_thin_air() -> Self;
+}
+
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
+pub struct BrowserUrlContext;
+
+impl UrlContextType for BrowserUrlContext {
+    fn produce_from_thin_air() -> Self {
+        Self
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
+pub struct RouterUrlContext;
+
+impl UrlContextType for RouterUrlContext {
+    fn produce_from_thin_air() -> Self {
+        Self
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
+pub struct UrlContext<C: UrlContextType, T>(T, PhantomData<C>);
+
+impl<C: UrlContextType, T> UrlContext<C, UrlContext<C, T>> {
+    pub fn flatten(self) -> UrlContext<C, T> {
+        UrlContext(self.0 .0, PhantomData)
+    }
+}
+
+impl<C: UrlContextType, T> UrlContext<C, T> {
+    pub const fn new(value: T) -> Self {
+        Self(value, PhantomData)
+    }
+
+    pub fn forget_context(self, _context: C) -> T {
+        self.0
+    }
+
+    pub fn change_context<C2: UrlContextType>(
+        self,
+        _context: C,
+    ) -> UrlContext<C2, T> {
+        UrlContext(self.0, PhantomData)
+    }
+}
+
+pub trait UrlContexty<'a, C: UrlContextType, T, RefT, MutT> {
+    fn as_ref(&'a self) -> UrlContext<C, RefT>;
+
+    fn as_mut(&'a mut self) -> UrlContext<C, MutT>;
+
+    fn test(self, mapper: impl FnOnce(T) -> bool) -> bool;
+
+    fn map<Q>(self, mapper: impl FnOnce(T) -> Q) -> UrlContext<C, Q>;
+
+    fn map_opt<Q>(
+        self,
+        mapper: impl FnOnce(T) -> Option<Q>,
+    ) -> Option<UrlContext<C, Q>>;
+
+    fn map_mut<Q>(
+        &'a mut self,
+        mapper: impl FnOnce(MutT) -> Q,
+    ) -> UrlContext<C, Q>;
+}
+
+impl<'a, C: UrlContextType, T1> UrlContexty<'a, C, T1, &'a T1, &'a mut T1>
+    for UrlContext<C, T1>
+{
+    fn as_ref(&'a self) -> UrlContext<C, &'a T1> {
+        UrlContext(&self.0, PhantomData)
+    }
+
+    fn as_mut(&'a mut self) -> UrlContext<C, &'a mut T1> {
+        UrlContext(&mut self.0, PhantomData)
+    }
+
+    fn test(self, mapper: impl FnOnce(T1) -> bool) -> bool {
+        mapper(self.0)
+    }
+
+    fn map<Q>(self, mapper: impl FnOnce(T1) -> Q) -> UrlContext<C, Q> {
+        UrlContext(mapper(self.0), PhantomData)
+    }
+
+    fn map_opt<Q>(
+        self,
+        mapper: impl FnOnce(T1) -> Option<Q>,
+    ) -> Option<UrlContext<C, Q>> {
+        Some(UrlContext(mapper(self.0)?, PhantomData))
+    }
+
+    fn map_mut<Q>(
+        &'a mut self,
+        mapper: impl FnOnce(&'a mut T1) -> Q,
+    ) -> UrlContext<C, Q> {
+        UrlContext(mapper(&mut self.0), PhantomData)
+    }
+}
+
+impl<'a, C: UrlContextType, T1, T2>
+    UrlContexty<'a, C, (T1, T2), (&'a T1, &'a T2), (&'a mut T1, &'a mut T2)>
+    for (UrlContext<C, T1>, UrlContext<C, T2>)
+{
+    fn as_ref(&'a self) -> UrlContext<C, (&'a T1, &'a T2)> {
+        UrlContext((&self.0 .0, &self.1 .0), PhantomData)
+    }
+
+    fn as_mut(&'a mut self) -> UrlContext<C, (&'a mut T1, &'a mut T2)> {
+        UrlContext((&mut self.0 .0, &mut self.1 .0), PhantomData)
+    }
+
+    fn test(self, mapper: impl FnOnce((T1, T2)) -> bool) -> bool {
+        mapper((self.0 .0, self.1 .0))
+    }
+
+    fn map<Q>(self, mapper: impl FnOnce((T1, T2)) -> Q) -> UrlContext<C, Q> {
+        UrlContext(mapper((self.0 .0, self.1 .0)), PhantomData)
+    }
+
+    fn map_opt<Q>(
+        self,
+        mapper: impl FnOnce((T1, T2)) -> Option<Q>,
+    ) -> Option<UrlContext<C, Q>> {
+        Some(UrlContext(mapper((self.0 .0, self.1 .0))?, PhantomData))
+    }
+
+    fn map_mut<Q>(
+        &'a mut self,
+        mapper: impl FnOnce((&'a mut T1, &'a mut T2)) -> Q,
+    ) -> UrlContext<C, Q> {
+        UrlContext(mapper((&mut self.0 .0, &mut self.1 .0)), PhantomData)
+    }
+}
+
+impl<'a, C: UrlContextType, T1, T2, T3>
+    UrlContexty<
+        'a,
+        C,
+        (T1, T2, T3),
+        (&'a T1, &'a T2, &'a T3),
+        (&'a mut T1, &'a mut T2, &'a mut T3),
+    > for (UrlContext<C, T1>, UrlContext<C, T2>, UrlContext<C, T3>)
+{
+    fn as_ref(&'a self) -> UrlContext<C, (&'a T1, &'a T2, &'a T3)> {
+        UrlContext((&self.0 .0, &self.1 .0, &self.2 .0), PhantomData)
+    }
+
+    fn as_mut(
+        &'a mut self,
+    ) -> UrlContext<C, (&'a mut T1, &'a mut T2, &'a mut T3)> {
+        UrlContext(
+            (&mut self.0 .0, &mut self.1 .0, &mut self.2 .0),
+            PhantomData,
+        )
+    }
+
+    fn test(self, mapper: impl FnOnce((T1, T2, T3)) -> bool) -> bool {
+        mapper((self.0 .0, self.1 .0, self.2 .0))
+    }
+
+    fn map<Q>(
+        self,
+        mapper: impl FnOnce((T1, T2, T3)) -> Q,
+    ) -> UrlContext<C, Q> {
+        UrlContext(mapper((self.0 .0, self.1 .0, self.2 .0)), PhantomData)
+    }
+
+    fn map_opt<Q>(
+        self,
+        mapper: impl FnOnce((T1, T2, T3)) -> Option<Q>,
+    ) -> Option<UrlContext<C, Q>> {
+        Some(UrlContext(
+            mapper((self.0 .0, self.1 .0, self.2 .0))?,
+            PhantomData,
+        ))
+    }
+
+    fn map_mut<Q>(
+        &'a mut self,
+        mapper: impl FnOnce((&'a mut T1, &'a mut T2, &'a mut T3)) -> Q,
+    ) -> UrlContext<C, Q> {
+        UrlContext(
+            mapper((&mut self.0 .0, &mut self.1 .0, &mut self.2 .0)),
+            PhantomData,
+        )
+    }
+}
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Url {
@@ -33,6 +225,7 @@ pub struct Url {
     hash: String,
 }
 
+// these are currently needed so the public api does not change too much
 impl Url {
     pub fn origin(&self) -> &str {
         &self.origin
@@ -73,72 +266,128 @@ impl Url {
     pub fn hash_mut(&mut self) -> &mut String {
         &mut self.hash
     }
+}
+
+impl<C: UrlContextType> UrlContext<C, Url> {
+    pub fn origin(&self) -> UrlContext<C, &str> {
+        self.as_ref().map(|u| u.origin.as_str())
+    }
+
+    pub fn origin_mut(&mut self) -> UrlContext<C, &mut String> {
+        self.map_mut(|u| &mut u.origin)
+    }
+
+    pub fn path(&self) -> UrlContext<C, &str> {
+        self.as_ref().map(|u| u.path.as_str())
+    }
+
+    pub fn path_mut(&mut self) -> UrlContext<C, &mut str> {
+        self.map_mut(|u| u.path.as_mut_str())
+    }
+
+    pub fn search(&self) -> UrlContext<C, &str> {
+        self.as_ref().map(|u| u.search.as_str())
+    }
+
+    pub fn search_mut(&mut self) -> UrlContext<C, &mut String> {
+        self.map_mut(|u| &mut u.search)
+    }
+
+    pub fn search_params(&self) -> UrlContext<C, &ParamsMap> {
+        self.as_ref().map(|u| &u.search_params)
+    }
+
+    pub fn search_params_mut(&mut self) -> UrlContext<C, &mut ParamsMap> {
+        self.map_mut(|u| &mut u.search_params)
+    }
+
+    pub fn hash(&self) -> UrlContext<C, &str> {
+        self.as_ref().map(|u| u.hash.as_str())
+    }
+
+    pub fn hash_mut(&mut self) -> UrlContext<C, &mut String> {
+        self.map_mut(|u| &mut u.hash)
+    }
 
     pub fn provide_server_action_error(&self) {
         let search_params = self.search_params();
         if let (Some(err), Some(path)) = (
-            search_params.get_str("__err"),
-            search_params.get_str("__path"),
+            search_params
+                .as_ref()
+                .forget_context(C::produce_from_thin_air())
+                .get_str("__err"),
+            search_params
+                .as_ref()
+                .forget_context(C::produce_from_thin_air())
+                .get_str("__path"),
         ) {
             provide_context(ServerActionError::new(path, err))
         }
     }
 
-    pub(crate) fn to_full_path(&self) -> String {
-        let mut path = self.path.to_string();
-        if !self.search.is_empty() {
-            path.push('?');
-            path.push_str(&self.search);
-        }
-        if !self.hash.is_empty() {
-            if !self.hash.starts_with('#') {
-                path.push('#');
+    pub(crate) fn to_full_path(&self) -> UrlContext<C, String> {
+        let mut path = self.as_ref().map(|u| u.path.to_string());
+        self.as_ref().map(|u| {
+            if !u.search.is_empty() {
+                path.map_mut(|p| p.push('?'));
+                path.map_mut(|p| p.push_str(&u.search));
             }
-            path.push_str(&self.hash);
-        }
+        });
+        self.as_ref().map(|u| {
+            if !u.hash.is_empty() {
+                if !u.hash.starts_with('#') {
+                    path.map_mut(|p| p.push('#'));
+                }
+                path.map_mut(|p| p.push_str(&u.hash));
+            }
+        });
         path
     }
 
-    pub fn escape(s: &str) -> String {
+    pub fn escape(s: UrlContext<C, &str>) -> UrlContext<C, String> {
         #[cfg(not(feature = "ssr"))]
         {
-            js_sys::encode_uri_component(s).as_string().unwrap()
+            s.map(|s| js_sys::encode_uri_component(s).as_string().unwrap())
         }
         #[cfg(feature = "ssr")]
         {
-            percent_encoding::utf8_percent_encode(
-                s,
-                percent_encoding::NON_ALPHANUMERIC,
-            )
-            .to_string()
-        }
-    }
-
-    pub fn unescape(s: &str) -> String {
-        #[cfg(feature = "ssr")]
-        {
-            percent_encoding::percent_decode_str(s)
-                .decode_utf8()
-                .unwrap()
+            s.map(|s| {
+                percent_encoding::utf8_percent_encode(
+                    s,
+                    percent_encoding::NON_ALPHANUMERIC,
+                )
                 .to_string()
-        }
-
-        #[cfg(not(feature = "ssr"))]
-        {
-            match js_sys::decode_uri_component(s) {
-                Ok(v) => v.into(),
-                Err(_) => s.into(),
-            }
+            })
         }
     }
 
-    pub fn unescape_minimal(s: &str) -> String {
+    pub fn unescape(s: UrlContext<C, &str>) -> UrlContext<C, String> {
+        #[cfg(feature = "ssr")]
+        {
+            s.map(|s| {
+                percent_encoding::percent_decode_str(s)
+                    .decode_utf8()
+                    .unwrap()
+                    .to_string()
+            })
+        }
+
         #[cfg(not(feature = "ssr"))]
         {
-            match js_sys::decode_uri(s) {
+            s.map(|s| match js_sys::decode_uri_component(s) {
                 Ok(v) => v.into(),
-                Err(_) => s.into(),
-            }
+                Err(_) => (*s).into(),
+            })
+        }
+    }
+
+    pub fn unescape_minimal(s: UrlContext<C, &str>) -> UrlContext<C, String> {
+        #[cfg(not(feature = "ssr"))]
+        {
+            s.map(|s| match js_sys::decode_uri(s) {
+                Ok(v) => v.into(),
+                Err(_) => (*s).into(),
+            })
         }
 
         #[cfg(feature = "ssr")]
@@ -153,29 +402,36 @@ impl Url {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Location {
     /// The path of the URL, not containing the query string or hash fragment.
-    pub pathname: Memo<String>,
+    pub pathname: Memo<UrlContext<RouterUrlContext, String>>,
     /// The raw query string.
-    pub search: Memo<String>,
+    pub search: Memo<UrlContext<RouterUrlContext, String>>,
     /// The query string parsed into its key-value pairs.
-    pub query: Memo<ParamsMap>,
+    pub query: Memo<UrlContext<RouterUrlContext, ParamsMap>>,
     /// The hash fragment.
-    pub hash: Memo<String>,
+    pub hash: Memo<UrlContext<RouterUrlContext, String>>,
     /// The [`state`](https://developer.mozilla.org/en-US/docs/Web/API/History/state) at the top of the history stack.
     pub state: ReadSignal<State>,
 }
 
 impl Location {
     pub(crate) fn new(
-        url: impl Into<ReadSignal<Url>>,
+        url: impl Into<ReadSignal<UrlContext<RouterUrlContext, Url>>>,
         state: impl Into<ReadSignal<State>>,
     ) -> Self {
         let url = url.into();
         let state = state.into();
-        let pathname = Memo::new(move |_| url.with(|url| url.path.clone()));
-        let search = Memo::new(move |_| url.with(|url| url.search.clone()));
-        let hash = Memo::new(move |_| url.with(|url| url.hash.clone()));
-        let query =
-            Memo::new(move |_| url.with(|url| url.search_params.clone()));
+        let pathname = Memo::new(move |_| {
+            url.with(|url| url.as_ref().map(|url| url.path.clone()))
+        });
+        let search = Memo::new(move |_| {
+            url.with(|url| url.as_ref().map(|url| url.search.clone()))
+        });
+        let hash = Memo::new(move |_| {
+            url.with(|url| url.as_ref().map(|url| url.hash.clone()))
+        });
+        let query = Memo::new(move |_| {
+            url.with(|url| url.as_ref().map(|url| url.search_params.clone()))
+        });
         Location {
             pathname,
             search,
@@ -190,7 +446,7 @@ impl Location {
 #[derive(Debug, Clone, PartialEq)]
 pub struct LocationChange {
     /// The new URL.
-    pub value: String,
+    pub value: UrlContext<RouterUrlContext, std::string::String>,
     /// If true, the new location will replace the current one in the history stack, i.e.,
     /// clicking the "back" button will not return to the current location.
     pub replace: bool,
@@ -216,12 +472,15 @@ pub trait LocationProvider: Clone + 'static {
 
     fn new() -> Result<Self, Self::Error>;
 
-    fn as_url(&self) -> &ArcRwSignal<Url>;
+    fn as_url(&self) -> &ArcRwSignal<UrlContext<RouterUrlContext, Url>>;
 
-    fn current() -> Result<Url, Self::Error>;
+    fn current() -> Result<UrlContext<RouterUrlContext, Url>, Self::Error>;
 
     /// Sets up any global event listeners or other initialization needed.
-    fn init(&self, base: Option<Cow<'static, str>>);
+    fn init(
+        &self,
+        base: UrlContext<RouterUrlContext, Option<Cow<'static, str>>>,
+    );
 
     /// Should be called after a navigation when all route components and data have been loaded and
     /// the URL can be updated.
@@ -230,13 +489,18 @@ pub trait LocationProvider: Clone + 'static {
     /// Update the browser's history to reflect a new location.
     fn complete_navigation(&self, loc: &LocationChange);
 
-    fn parse(url: &str) -> Result<Url, Self::Error> {
+    fn parse(
+        url: UrlContext<RouterUrlContext, &str>,
+    ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
         Self::parse_with_base(url, BASE)
     }
 
-    fn parse_with_base(url: &str, base: &str) -> Result<Url, Self::Error>;
+    fn parse_with_base(
+        url: UrlContext<RouterUrlContext, &str>,
+        base: UrlContext<BrowserUrlContext, &str>,
+    ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error>;
 
-    fn redirect(loc: &str);
+    fn redirect(loc: &UrlContext<RouterUrlContext, &str>);
 
     /// Whether we are currently in a "back" navigation.
     fn is_back(&self) -> ReadSignal<bool>;
@@ -275,19 +539,27 @@ where
 }
 
 pub(crate) fn handle_anchor_click<NavFn, NavFut>(
-    router_base: Option<Cow<'static, str>>,
-    parse_with_base: fn(&str, &str) -> Result<Url, JsValue>,
+    router_base: UrlContext<RouterUrlContext, Option<Cow<'static, str>>>,
+    parse_with_base: fn(
+        UrlContext<RouterUrlContext, &str>,
+        UrlContext<BrowserUrlContext, &str>,
+    )
+        -> Result<UrlContext<RouterUrlContext, Url>, JsValue>,
     navigate: NavFn,
 ) -> Box<dyn Fn(Event) -> Result<(), JsValue>>
 where
-    NavFn: Fn(Url, LocationChange) -> NavFut + 'static,
+    NavFn: Fn(UrlContext<RouterUrlContext, Url>, LocationChange) -> NavFut
+        + 'static,
     NavFut: Future<Output = ()> + 'static,
 {
-    let router_base = router_base.unwrap_or_default();
+    let router_base =
+        router_base.map(|router_base| router_base.unwrap_or_default());
 
     Box::new(move |ev: Event| {
         let ev = ev.unchecked_into::<MouseEvent>();
-        let origin = window().location().origin()?;
+        let origin = UrlContext::<BrowserUrlContext, _>::new(
+            window().location().origin()?,
+        );
         if ev.default_prevented()
             || ev.button() != 0
             || ev.meta_key()
@@ -327,17 +599,28 @@ where
                 return Ok(());
             }
 
-            let url = parse_with_base(href.as_str(), &origin).unwrap();
-            let path_name = Url::unescape_minimal(&url.path);
+            let url = parse_with_base(
+                UrlContext::new(href.as_str()),
+                origin.as_ref().map(|origin| origin.as_str()),
+            )
+            .unwrap();
+            let path_name =
+                UrlContext::<RouterUrlContext, Url>::unescape_minimal(
+                    url.path(),
+                );
 
             // let browser handle this event if it leaves our domain
             // or our base path
-            if url.origin != origin
-                || (!router_base.is_empty()
-                    && !path_name.is_empty()
+            if url.origin()
+                != origin
+                    .as_ref()
+                    .map(|o| o.as_str())
+                    .change_context(BrowserUrlContext)
+                || (!router_base.as_ref().test(|router_base| router_base.is_empty())
+                    && !path_name.as_ref().test(|path_name| path_name.is_empty())
                     // NOTE: the two `to_lowercase()` calls here added a total of about 14kb to
                     // release binary size, for limited gain
-                    && !path_name.starts_with(&*router_base))
+                    && !path_name.as_ref().test(|path_name| path_name.starts_with(&**router_base.as_ref().forget_context(RouterUrlContext))))
             {
                 return Ok(());
             }
@@ -345,10 +628,24 @@ where
             // we've passed all the checks to navigate on the client side, so we prevent the
             // default behavior of the click
             ev.prevent_default();
-            let to = path_name
-                + if url.search.is_empty() { "" } else { "?" }
-                + &Url::unescape(&url.search)
-                + &Url::unescape(&url.hash);
+            let to = path_name.map(|path_name| {
+                path_name
+                    + if url
+                        .search()
+                        .forget_context(RouterUrlContext)
+                        .is_empty()
+                    {
+                        ""
+                    } else {
+                        "?"
+                    }
+                    + &UrlContext::<RouterUrlContext, Url>::unescape(
+                        url.search(),
+                    )
+                    .forget_context(RouterUrlContext)
+                    + &UrlContext::<RouterUrlContext, Url>::unescape(url.hash())
+                        .forget_context(RouterUrlContext)
+            });
             let state = Reflect::get(&a, &JsValue::from_str("state"))
                 .ok()
                 .and_then(|value| {

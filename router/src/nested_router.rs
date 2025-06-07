@@ -1,7 +1,9 @@
 use crate::{
     flat_router::MatchedRoute,
     hooks::Matched,
-    location::{LocationProvider, Url},
+    location::{
+        LocationProvider, RouterUrlContext, Url, UrlContext, UrlContexty as _,
+    },
     matching::RouteDefs,
     params::ParamsMap,
     view_transition::start_view_transition,
@@ -47,7 +49,7 @@ pub(crate) struct NestedRoutesView<Loc, Defs, FalFn> {
     pub location: Option<Loc>,
     pub routes: RouteDefs<Defs>,
     pub outer_owner: Owner,
-    pub current_url: ArcRwSignal<Url>,
+    pub current_url: ArcRwSignal<UrlContext<RouterUrlContext, Url>>,
     pub base: Option<Oco<'static, str>>,
     pub fallback: FalFn,
     pub set_is_routing: Option<SignalSetter<bool>>,
@@ -59,8 +61,8 @@ pub(crate) struct NestedRouteViewState<Fal>
 where
     Fal: Render,
 {
-    path: String,
-    current_url: ArcRwSignal<Url>,
+    path: UrlContext<RouterUrlContext, String>,
+    current_url: ArcRwSignal<UrlContext<RouterUrlContext, Url>>,
     outlets: Vec<RouteContext>,
     // TODO loading fallback
     #[allow(clippy::type_complexity)]
@@ -90,7 +92,7 @@ where
         let mut loaders = Vec::new();
         let mut outlets = Vec::new();
         let url = current_url.read_untracked();
-        let path = url.path().to_string();
+        let path = url.path().map(|u| u.to_string());
 
         // match the route
         let new_match = routes.match_route(url.path());
@@ -138,15 +140,18 @@ where
 
         // if the path is the same, we do not need to re-route
         // we can just update the search query and go about our day
-        if url_snapshot.path() == state.path {
+        if url_snapshot.path() == state.path.as_ref().map(|p| p.as_str()) {
             for outlet in &state.outlets {
                 outlet.url.set(url_snapshot.to_owned());
             }
             return;
         }
         // since the path didn't match, we'll update the retained path for future diffing
-        state.path.clear();
-        state.path.push_str(url_snapshot.path());
+        state.path.map_mut(|p| p.clear());
+        // TODO FIXME we shouldn't call two map calls like this because this does not ensure that the context is the same
+        url_snapshot.path().map(|url_snapshot| {
+            state.path.map_mut(|p| p.push_str(url_snapshot))
+        });
 
         let new_match = self.routes.match_route(url_snapshot.path());
 
@@ -431,7 +436,7 @@ where
         let mut loaders = Vec::new();
         let mut outlets = Vec::new();
         let url = current_url.read_untracked();
-        let path = url.path().to_string();
+        let path = url.path().map(|path| path.to_string());
 
         // match the route
         let new_match = routes.match_route(url.path());
@@ -478,7 +483,7 @@ type OutletViewFn = Box<dyn FnMut(Owner) -> Suspend<AnyView> + Send>;
 pub(crate) struct RouteContext {
     id: RouteMatchId,
     trigger: ArcTrigger,
-    url: ArcRwSignal<Url>,
+    url: ArcRwSignal<UrlContext<RouterUrlContext, Url>>,
     params: ArcRwSignal<ParamsMap>,
     owner: Owner,
     pub matched: ArcRwSignal<String>,
@@ -524,7 +529,7 @@ impl Clone for RouteContext {
 trait AddNestedRoute {
     fn build_nested_route(
         self,
-        url: &Url,
+        url: &UrlContext<RouterUrlContext, Url>,
         base: Option<Oco<'static, str>>,
         loaders: &mut Vec<Pin<Box<dyn Future<Output = ArcTrigger>>>>,
         outlets: &mut Vec<RouteContext>,
@@ -534,7 +539,7 @@ trait AddNestedRoute {
     #[allow(clippy::too_many_arguments)]
     fn rebuild_nested_route(
         self,
-        url: &Url,
+        url: &UrlContext<RouterUrlContext, Url>,
         base: Option<Oco<'static, str>>,
         items: &mut usize,
         loaders: &mut Vec<Pin<Box<dyn Future<Output = ArcTrigger>>>>,
@@ -552,7 +557,7 @@ where
 {
     fn build_nested_route(
         self,
-        url: &Url,
+        url: &UrlContext<RouterUrlContext, Url>,
         base: Option<Oco<'static, str>>,
         loaders: &mut Vec<Pin<Box<dyn Future<Output = ArcTrigger>>>>,
         outlets: &mut Vec<RouteContext>,
@@ -693,7 +698,7 @@ where
     #[allow(clippy::too_many_arguments)]
     fn rebuild_nested_route(
         self,
-        url: &Url,
+        url: &UrlContext<RouterUrlContext, Url>,
         base: Option<Oco<'static, str>>,
         items: &mut usize,
         preloaders: &mut Vec<Pin<Box<dyn Future<Output = ArcTrigger>>>>,

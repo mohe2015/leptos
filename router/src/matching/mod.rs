@@ -9,7 +9,11 @@ pub use path_segment::*;
 mod horizontal;
 mod nested;
 mod vertical;
-use crate::{static_routes::RegenerationFn, Method, SsrMode};
+use crate::{
+    location::{RouterUrlContext, UrlContext, UrlContexty as _},
+    static_routes::RegenerationFn,
+    Method, SsrMode,
+};
 pub use horizontal::*;
 pub use nested::*;
 use std::{borrow::Cow, collections::HashSet, sync::atomic::Ordering};
@@ -17,7 +21,7 @@ pub use vertical::*;
 
 #[derive(Debug)]
 pub struct RouteDefs<Children> {
-    base: Option<Cow<'static, str>>,
+    base: UrlContext<RouterUrlContext, Option<Cow<'static, str>>>,
     children: Children,
 }
 
@@ -36,17 +40,17 @@ where
 impl<Children> RouteDefs<Children> {
     pub fn new(children: Children) -> Self {
         Self {
-            base: None,
+            base: UrlContext::new(None),
             children,
         }
     }
 
     pub fn new_with_base(
         children: Children,
-        base: impl Into<Cow<'static, str>>,
+        base: UrlContext<RouterUrlContext, impl Into<Cow<'static, str>>>,
     ) -> Self {
         Self {
-            base: Some(base.into()),
+            base: base.map(|base| Some(base.into())),
             children,
         }
     }
@@ -56,23 +60,29 @@ impl<Children> RouteDefs<Children>
 where
     Children: MatchNestedRoutes,
 {
-    pub fn match_route(&self, path: &str) -> Option<Children::Match> {
-        let path = match &self.base {
+    pub fn match_route(
+        &self,
+        path: UrlContext<RouterUrlContext, &str>,
+    ) -> Option<Children::Match> {
+        let path = match self.base.as_ref().forget_context(RouterUrlContext) {
             None => path,
             Some(base) => {
                 let (base, path) = if base.starts_with('/') {
-                    (base.trim_start_matches('/'), path.trim_start_matches('/'))
+                    (
+                        base.trim_start_matches('/'),
+                        path.map(|p| p.trim_start_matches('/')),
+                    )
                 } else {
                     (base.as_ref(), path)
                 };
-                path.strip_prefix(base)?
+                path.map_opt(|p| p.strip_prefix(base))?
             }
         };
 
         let (matched, remaining) = self.children.match_nested(path);
         let matched = matched?;
 
-        if !(remaining.is_empty() || remaining == "/") {
+        if !remaining.test(|r| r.is_empty() || r == "/") {
             None
         } else {
             Some(matched.1)
@@ -85,7 +95,14 @@ where
         Option<&str>,
         impl IntoIterator<Item = GeneratedRouteData> + '_,
     ) {
-        (self.base.as_deref(), self.children.generate_routes())
+        // TODO FIXME
+        (
+            self.base
+                .as_ref()
+                .forget_context(RouterUrlContext)
+                .as_deref(),
+            self.children.generate_routes(),
+        )
     }
 }
 
@@ -136,8 +153,11 @@ pub trait MatchNestedRoutes {
     /// * 1 - Remaining path
     fn match_nested<'a>(
         &'a self,
-        path: &'a str,
-    ) -> (Option<(RouteMatchId, Self::Match)>, &'a str);
+        path: UrlContext<RouterUrlContext, &'a str>,
+    ) -> (
+        Option<(RouteMatchId, Self::Match)>,
+        UrlContext<RouterUrlContext, &'a str>,
+    );
 
     fn generate_routes(
         &self,
@@ -158,8 +178,8 @@ pub struct GeneratedRouteData {
 mod tests {
     use super::{NestedRoute, ParamSegment, RouteDefs};
     use crate::{
-        matching::MatchParams, MatchInterface, PathSegment, StaticSegment,
-        WildcardSegment,
+        location::UrlContext, matching::MatchParams, MatchInterface,
+        PathSegment, StaticSegment, WildcardSegment,
     };
     use either_of::{Either, EitherOf4};
 
@@ -167,12 +187,12 @@ mod tests {
     pub fn matches_single_root_route() {
         let routes =
             RouteDefs::<_>::new(NestedRoute::new(StaticSegment("/"), || ()));
-        let matched = routes.match_route("/");
+        let matched = routes.match_route(UrlContext::new("/"));
         assert!(matched.is_some());
         // this case seems like it should match, but implementing it interferes with
         // handling trailing slash requirements accurately -- paths for the root are "/",
         // not "", in any case
-        let matched = routes.match_route("");
+        let matched = routes.match_route(UrlContext::new(""));
         assert!(matched.is_none());
         let (base, paths) = routes.generate_routes();
         assert_eq!(base, None);
@@ -204,7 +224,9 @@ mod tests {
             ]]
         );
 
-        let matched = routes.match_route("/author/contact").unwrap();
+        let matched = routes
+            .match_route(UrlContext::new("/author/contact"))
+            .unwrap();
         assert_eq!(MatchInterface::as_matched(&matched), "");
         let (_, child) = MatchInterface::into_view_and_child(matched);
         assert_eq!(
@@ -219,7 +241,7 @@ mod tests {
             NestedRoute::new(StaticSegment("/property-api"), || ()),
             NestedRoute::new(StaticSegment("/property"), || ()),
         ));
-        let matched = routes.match_route("/property").unwrap();
+        let matched = routes.match_route(UrlContext::new("/property")).unwrap();
         assert!(matches!(matched, Either::Right(_)));
     }
 
@@ -233,7 +255,7 @@ mod tests {
                 ),
             ),
         );
-        let matched = routes.match_route("/");
+        let matched = routes.match_route(UrlContext::new("/"));
         assert!(matched.is_none());
     }
 
@@ -280,13 +302,15 @@ mod tests {
             ]
         );
 
-        let matched = routes.match_route("/about").unwrap();
+        let matched = routes.match_route(UrlContext::new("/about")).unwrap();
         let params = matched.to_params();
         assert!(params.is_empty());
-        let matched = routes.match_route("/blog").unwrap();
+        let matched = routes.match_route(UrlContext::new("/blog")).unwrap();
         let params = matched.to_params();
         assert!(params.is_empty());
-        let matched = routes.match_route("/blog/post/42").unwrap();
+        let matched = routes
+            .match_route(UrlContext::new("/blog/post/42"))
+            .unwrap();
         let params = matched.to_params();
         assert_eq!(params, vec![("id".into(), "42".into())]);
     }
@@ -312,29 +336,37 @@ mod tests {
                     || (),
                 ),
             ),
-            "/portfolio",
+            UrlContext::new("/portfolio"),
         );
 
         // generates routes correctly
         let (base, _paths) = routes.generate_routes();
         assert_eq!(base, Some("/portfolio"));
 
-        let matched = routes.match_route("/about");
+        let matched = routes.match_route(UrlContext::new("/about"));
         assert!(matched.is_none());
 
-        let matched = routes.match_route("/portfolio/about").unwrap();
+        let matched = routes
+            .match_route(UrlContext::new("/portfolio/about"))
+            .unwrap();
         let params = matched.to_params();
         assert!(params.is_empty());
 
-        let matched = routes.match_route("/portfolio/blog/post/42").unwrap();
+        let matched = routes
+            .match_route(UrlContext::new("/portfolio/blog/post/42"))
+            .unwrap();
         let params = matched.to_params();
         assert_eq!(params, vec![("id".into(), "42".into())]);
 
-        let matched = routes.match_route("/portfolio/contact").unwrap();
+        let matched = routes
+            .match_route(UrlContext::new("/portfolio/contact"))
+            .unwrap();
         let params = matched.to_params();
         assert_eq!(params, vec![("any".into(), "".into())]);
 
-        let matched = routes.match_route("/portfolio/contact/foobar").unwrap();
+        let matched = routes
+            .match_route(UrlContext::new("/portfolio/contact/foobar"))
+            .unwrap();
         let params = matched.to_params();
         assert_eq!(params, vec![("any".into(), "foobar".into())]);
     }
@@ -351,13 +383,13 @@ mod tests {
             NestedRoute::new(WildcardSegment("any"), || ()),
         ));
 
-        let matched = routes.match_route("/users");
+        let matched = routes.match_route(UrlContext::new("/users"));
         assert!(matches!(matched, Some(EitherOf4::B(..))));
 
-        let matched = routes.match_route("/users/id");
+        let matched = routes.match_route(UrlContext::new("/users/id"));
         assert!(matches!(matched, Some(EitherOf4::C(..))));
 
-        let matched = routes.match_route("/usersid");
+        let matched = routes.match_route(UrlContext::new("/usersid"));
         assert!(matches!(matched, Some(EitherOf4::D(..))));
     }
 }
@@ -366,18 +398,19 @@ mod tests {
 #[derive(Debug)]
 pub struct PartialPathMatch<'a> {
     /// unmatched yet part of the path
-    pub(crate) remaining: &'a str,
+    pub(crate) remaining: UrlContext<RouterUrlContext, &'a str>,
     /// value of parameters encoded inside of the path
-    pub(crate) params: Vec<(Cow<'static, str>, String)>,
+    pub(crate) params:
+        UrlContext<RouterUrlContext, Vec<(Cow<'static, str>, String)>>,
     /// part of the original path that was matched by segment
-    pub(crate) matched: &'a str,
+    pub(crate) matched: UrlContext<RouterUrlContext, &'a str>,
 }
 
 impl<'a> PartialPathMatch<'a> {
     pub fn new(
-        remaining: &'a str,
-        params: Vec<(Cow<'static, str>, String)>,
-        matched: &'a str,
+        remaining: UrlContext<RouterUrlContext, &'a str>,
+        params: UrlContext<RouterUrlContext, Vec<(Cow<'static, str>, String)>>,
+        matched: UrlContext<RouterUrlContext, &'a str>,
     ) -> Self {
         Self {
             remaining,
@@ -387,18 +420,21 @@ impl<'a> PartialPathMatch<'a> {
     }
 
     pub fn is_complete(&self) -> bool {
-        self.remaining.is_empty() || self.remaining == "/"
+        self.remaining
+            .test(|remaining| remaining.is_empty() || remaining == "/")
     }
 
-    pub fn remaining(&self) -> &'a str {
+    pub fn remaining(&self) -> UrlContext<RouterUrlContext, &'a str> {
         self.remaining
     }
 
-    pub fn params(self) -> Vec<(Cow<'static, str>, String)> {
+    pub fn params(
+        self,
+    ) -> UrlContext<RouterUrlContext, Vec<(Cow<'static, str>, String)>> {
         self.params
     }
 
-    pub fn matched(&self) -> &'a str {
+    pub fn matched(&self) -> UrlContext<RouterUrlContext, &'a str> {
         self.matched
     }
 }
