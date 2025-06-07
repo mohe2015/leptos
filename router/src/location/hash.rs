@@ -236,24 +236,26 @@ impl Routing for HashRouter {
     fn complete_navigation(&self, loc: &LocationChange) {
         let history = window().history().unwrap();
 
+        let url = self
+            .router_to_browser_url(UrlContext::parse(
+                loc.value.as_ref().map(|v| v.as_str()),
+            ))
+            .unwrap();
+        let url = url.origin().forget_context(BrowserUrlContext).to_owned()
+            + &url.to_full_path().forget_context(BrowserUrlContext);
+
         if loc.replace {
             history
                 .replace_state_with_url(
                     &loc.state.to_js_value(),
                     "",
-                    Some(loc.value.as_ref().forget_context(RouterUrlContext)),
+                    Some(&url),
                 )
                 .unwrap();
         } else {
             // push the "forward direction" marker
             let state = &loc.state.to_js_value();
-            history
-                .push_state_with_url(
-                    state,
-                    "",
-                    Some(loc.value.as_ref().forget_context(RouterUrlContext)),
-                )
-                .unwrap();
+            history.push_state_with_url(state, "", Some(&url)).unwrap();
         }
 
         // add this URL to the "path stack" for detecting back navigations, and
