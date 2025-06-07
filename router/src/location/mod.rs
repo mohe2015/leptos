@@ -82,15 +82,19 @@ pub trait UrlContexty<'a, C: UrlContextType, T, RefT, MutT> {
 
     fn as_mut(&'a mut self) -> UrlContext<C, MutT>;
 
+    #[track_caller]
     fn test(self, mapper: impl FnOnce(T) -> bool) -> bool;
 
+    #[track_caller]
     fn map<Q>(self, mapper: impl FnOnce(T) -> Q) -> UrlContext<C, Q>;
 
+    #[track_caller]
     fn map_opt<Q>(
         self,
         mapper: impl FnOnce(T) -> Option<Q>,
     ) -> Option<UrlContext<C, Q>>;
 
+    #[track_caller]
     fn map_mut<Q>(
         &'a mut self,
         mapper: impl FnOnce(MutT) -> Q,
@@ -108,14 +112,17 @@ impl<'a, C: UrlContextType, T1> UrlContexty<'a, C, T1, &'a T1, &'a mut T1>
         UrlContext(&mut self.0, PhantomData)
     }
 
+    #[track_caller]
     fn test(self, mapper: impl FnOnce(T1) -> bool) -> bool {
         mapper(self.0)
     }
 
+    #[track_caller]
     fn map<Q>(self, mapper: impl FnOnce(T1) -> Q) -> UrlContext<C, Q> {
         UrlContext(mapper(self.0), PhantomData)
     }
 
+    #[track_caller]
     fn map_opt<Q>(
         self,
         mapper: impl FnOnce(T1) -> Option<Q>,
@@ -123,6 +130,7 @@ impl<'a, C: UrlContextType, T1> UrlContexty<'a, C, T1, &'a T1, &'a mut T1>
         Some(UrlContext(mapper(self.0)?, PhantomData))
     }
 
+    #[track_caller]
     fn map_mut<Q>(
         &'a mut self,
         mapper: impl FnOnce(&'a mut T1) -> Q,
@@ -143,14 +151,17 @@ impl<'a, C: UrlContextType, T1, T2>
         UrlContext((&mut self.0 .0, &mut self.1 .0), PhantomData)
     }
 
+    #[track_caller]
     fn test(self, mapper: impl FnOnce((T1, T2)) -> bool) -> bool {
         mapper((self.0 .0, self.1 .0))
     }
 
+    #[track_caller]
     fn map<Q>(self, mapper: impl FnOnce((T1, T2)) -> Q) -> UrlContext<C, Q> {
         UrlContext(mapper((self.0 .0, self.1 .0)), PhantomData)
     }
 
+    #[track_caller]
     fn map_opt<Q>(
         self,
         mapper: impl FnOnce((T1, T2)) -> Option<Q>,
@@ -158,6 +169,7 @@ impl<'a, C: UrlContextType, T1, T2>
         Some(UrlContext(mapper((self.0 .0, self.1 .0))?, PhantomData))
     }
 
+    #[track_caller]
     fn map_mut<Q>(
         &'a mut self,
         mapper: impl FnOnce((&'a mut T1, &'a mut T2)) -> Q,
@@ -188,10 +200,12 @@ impl<'a, C: UrlContextType, T1, T2, T3>
         )
     }
 
+    #[track_caller]
     fn test(self, mapper: impl FnOnce((T1, T2, T3)) -> bool) -> bool {
         mapper((self.0 .0, self.1 .0, self.2 .0))
     }
 
+    #[track_caller]
     fn map<Q>(
         self,
         mapper: impl FnOnce((T1, T2, T3)) -> Q,
@@ -199,6 +213,7 @@ impl<'a, C: UrlContextType, T1, T2, T3>
         UrlContext(mapper((self.0 .0, self.1 .0, self.2 .0)), PhantomData)
     }
 
+    #[track_caller]
     fn map_opt<Q>(
         self,
         mapper: impl FnOnce((T1, T2, T3)) -> Option<Q>,
@@ -209,6 +224,7 @@ impl<'a, C: UrlContextType, T1, T2, T3>
         ))
     }
 
+    #[track_caller]
     fn map_mut<Q>(
         &'a mut self,
         mapper: impl FnOnce((&'a mut T1, &'a mut T2, &'a mut T3)) -> Q,

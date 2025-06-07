@@ -237,7 +237,7 @@ impl Routing for HashRouter {
         let history = window().history().unwrap();
 
         let url = self
-            .router_to_browser_url(UrlContext::parse(
+            .router_to_browser_url(UrlContext::parse_with_default_base(
                 loc.value.as_ref().map(|v| v.as_str()),
             ))
             .unwrap();
