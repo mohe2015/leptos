@@ -647,11 +647,11 @@ impl core::fmt::Debug for ServerRedirectFunction {
 /// Provides a function that can be used to redirect the user to another
 /// absolute path, on the server. This should set a `302` status code and an
 /// appropriate `Location` header.
-pub fn provide_server_redirect(
-    handler: impl Fn(&UrlContext<RouterUrlContext, &str>) + Send + Sync + 'static,
-) {
+pub fn provide_server_redirect(handler: impl Fn(&str) + Send + Sync + 'static) {
     provide_context(ServerRedirectFunction {
-        f: Arc::new(handler),
+        f: Arc::new(move |param| {
+            handler(param.forget_context(RouterUrlContext))
+        }),
     })
 }
 

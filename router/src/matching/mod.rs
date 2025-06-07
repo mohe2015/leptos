@@ -178,8 +178,8 @@ pub struct GeneratedRouteData {
 mod tests {
     use super::{NestedRoute, ParamSegment, RouteDefs};
     use crate::{
-        matching::MatchParams, MatchInterface, PathSegment, StaticSegment,
-        WildcardSegment,
+        location::UrlContext, matching::MatchParams, MatchInterface,
+        PathSegment, StaticSegment, WildcardSegment,
     };
     use either_of::{Either, EitherOf4};
 
@@ -187,12 +187,12 @@ mod tests {
     pub fn matches_single_root_route() {
         let routes =
             RouteDefs::<_>::new(NestedRoute::new(StaticSegment("/"), || ()));
-        let matched = routes.match_route("/");
+        let matched = routes.match_route(UrlContext::new("/"));
         assert!(matched.is_some());
         // this case seems like it should match, but implementing it interferes with
         // handling trailing slash requirements accurately -- paths for the root are "/",
         // not "", in any case
-        let matched = routes.match_route("");
+        let matched = routes.match_route(UrlContext::new(""));
         assert!(matched.is_none());
         let (base, paths) = routes.generate_routes();
         assert_eq!(base, None);
@@ -224,7 +224,9 @@ mod tests {
             ]]
         );
 
-        let matched = routes.match_route("/author/contact").unwrap();
+        let matched = routes
+            .match_route(UrlContext::new("/author/contact"))
+            .unwrap();
         assert_eq!(MatchInterface::as_matched(&matched), "");
         let (_, child) = MatchInterface::into_view_and_child(matched);
         assert_eq!(
@@ -239,7 +241,7 @@ mod tests {
             NestedRoute::new(StaticSegment("/property-api"), || ()),
             NestedRoute::new(StaticSegment("/property"), || ()),
         ));
-        let matched = routes.match_route("/property").unwrap();
+        let matched = routes.match_route(UrlContext::new("/property")).unwrap();
         assert!(matches!(matched, Either::Right(_)));
     }
 
@@ -253,7 +255,7 @@ mod tests {
                 ),
             ),
         );
-        let matched = routes.match_route("/");
+        let matched = routes.match_route(UrlContext::new("/"));
         assert!(matched.is_none());
     }
 
@@ -300,13 +302,15 @@ mod tests {
             ]
         );
 
-        let matched = routes.match_route("/about").unwrap();
+        let matched = routes.match_route(UrlContext::new("/about")).unwrap();
         let params = matched.to_params();
         assert!(params.is_empty());
-        let matched = routes.match_route("/blog").unwrap();
+        let matched = routes.match_route(UrlContext::new("/blog")).unwrap();
         let params = matched.to_params();
         assert!(params.is_empty());
-        let matched = routes.match_route("/blog/post/42").unwrap();
+        let matched = routes
+            .match_route(UrlContext::new("/blog/post/42"))
+            .unwrap();
         let params = matched.to_params();
         assert_eq!(params, vec![("id".into(), "42".into())]);
     }
@@ -332,29 +336,37 @@ mod tests {
                     || (),
                 ),
             ),
-            "/portfolio",
+            UrlContext::new("/portfolio"),
         );
 
         // generates routes correctly
         let (base, _paths) = routes.generate_routes();
         assert_eq!(base, Some("/portfolio"));
 
-        let matched = routes.match_route("/about");
+        let matched = routes.match_route(UrlContext::new("/about"));
         assert!(matched.is_none());
 
-        let matched = routes.match_route("/portfolio/about").unwrap();
+        let matched = routes
+            .match_route(UrlContext::new("/portfolio/about"))
+            .unwrap();
         let params = matched.to_params();
         assert!(params.is_empty());
 
-        let matched = routes.match_route("/portfolio/blog/post/42").unwrap();
+        let matched = routes
+            .match_route(UrlContext::new("/portfolio/blog/post/42"))
+            .unwrap();
         let params = matched.to_params();
         assert_eq!(params, vec![("id".into(), "42".into())]);
 
-        let matched = routes.match_route("/portfolio/contact").unwrap();
+        let matched = routes
+            .match_route(UrlContext::new("/portfolio/contact"))
+            .unwrap();
         let params = matched.to_params();
         assert_eq!(params, vec![("any".into(), "".into())]);
 
-        let matched = routes.match_route("/portfolio/contact/foobar").unwrap();
+        let matched = routes
+            .match_route(UrlContext::new("/portfolio/contact/foobar"))
+            .unwrap();
         let params = matched.to_params();
         assert_eq!(params, vec![("any".into(), "foobar".into())]);
     }
@@ -371,13 +383,13 @@ mod tests {
             NestedRoute::new(WildcardSegment("any"), || ()),
         ));
 
-        let matched = routes.match_route("/users");
+        let matched = routes.match_route(UrlContext::new("/users"));
         assert!(matches!(matched, Some(EitherOf4::B(..))));
 
-        let matched = routes.match_route("/users/id");
+        let matched = routes.match_route(UrlContext::new("/users/id"));
         assert!(matches!(matched, Some(EitherOf4::C(..))));
 
-        let matched = routes.match_route("/usersid");
+        let matched = routes.match_route(UrlContext::new("/usersid"));
         assert!(matches!(matched, Some(EitherOf4::D(..))));
     }
 }

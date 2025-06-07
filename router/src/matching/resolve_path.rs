@@ -107,19 +107,33 @@ fn remove_wildcard(text: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use crate::location::BrowserUrlContext;
+
     use super::*;
     #[test]
     fn normalize_query_string_with_opening_slash() {
-        assert_eq!(normalize("/?foo=bar", false), "?foo=bar");
+        assert_eq!(
+            normalize::<BrowserUrlContext>(UrlContext::new("/?foo=bar"), false),
+            UrlContext::new("?foo=bar".into())
+        );
     }
 
     #[test]
     fn normalize_retain_trailing_slash() {
-        assert_eq!(normalize("foo/bar/", false), "/foo/bar/");
+        assert_eq!(
+            normalize::<BrowserUrlContext>(UrlContext::new("foo/bar/"), false),
+            UrlContext::new("/foo/bar/".into())
+        );
     }
 
     #[test]
     fn normalize_dedup_trailing_slashes() {
-        assert_eq!(normalize("foo/bar/////", false), "/foo/bar/");
+        assert_eq!(
+            normalize::<BrowserUrlContext>(
+                UrlContext::new("foo/bar/////"),
+                false
+            ),
+            UrlContext::new("/foo/bar/".into())
+        );
     }
 }
