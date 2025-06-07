@@ -77,7 +77,7 @@ where
     let (location_provider, current_url, redirect_hook) = {
         let req = use_context::<RequestUrl>().expect("no RequestUrl provided");
         let parsed = req.parse().expect("could not parse RequestUrl");
-        let current_url = ArcRwSignal::new(parsed);
+        let current_url = ArcRwSignal::new(UrlContext::new(parsed));
 
         (None, current_url, Box::new(move |_: &str| {}))
     };

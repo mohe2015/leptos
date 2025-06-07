@@ -257,6 +257,7 @@ impl PossibleRouteMatch for OptionalParamSegment {
 mod tests {
     use super::PossibleRouteMatch;
     use crate::{
+        location::{UrlContext, UrlContexty as _},
         OptionalParamSegment, ParamSegment, StaticSegment, WildcardSegment,
     };
 
@@ -264,34 +265,52 @@ mod tests {
     fn single_param_match() {
         let path = "/foo";
         let def = ParamSegment("a");
-        let matched = def.test(path).expect("couldn't match route");
-        assert_eq!(matched.matched(), "/foo");
-        assert_eq!(matched.remaining(), "");
+        let matched = def
+            .test(UrlContext::new(path))
+            .expect("couldn't match route");
+        assert_eq!(matched.matched(), UrlContext::new("/foo"));
+        assert_eq!(matched.remaining(), UrlContext::new(""));
         let params = matched.params();
-        assert_eq!(params[0], ("a".into(), "foo".into()));
+        assert_eq!(
+            params.as_ref().map(|p| &p[0]),
+            UrlContext::new(&("a".into(), "foo".into()))
+        );
     }
 
     #[test]
     fn single_param_match_with_trailing_slash() {
         let path = "/foo/";
         let def = ParamSegment("a");
-        let matched = def.test(path).expect("couldn't match route");
-        assert_eq!(matched.matched(), "/foo");
-        assert_eq!(matched.remaining(), "/");
+        let matched = def
+            .test(UrlContext::new(path))
+            .expect("couldn't match route");
+        assert_eq!(matched.matched(), UrlContext::new("/foo"));
+        assert_eq!(matched.remaining(), UrlContext::new("/"));
         let params = matched.params();
-        assert_eq!(params[0], ("a".into(), "foo".into()));
+        assert_eq!(
+            params.as_ref().map(|p| &p[0]),
+            UrlContext::new(&("a".into(), "foo".into()))
+        );
     }
 
     #[test]
     fn tuple_of_param_matches() {
         let path = "/foo/bar";
         let def = (ParamSegment("a"), ParamSegment("b"));
-        let matched = def.test(path).expect("couldn't match route");
-        assert_eq!(matched.matched(), "/foo/bar");
-        assert_eq!(matched.remaining(), "");
+        let matched = def
+            .test(UrlContext::new(path))
+            .expect("couldn't match route");
+        assert_eq!(matched.matched(), UrlContext::new("/foo/bar"));
+        assert_eq!(matched.remaining(), UrlContext::new(""));
         let params = matched.params();
-        assert_eq!(params[0], ("a".into(), "foo".into()));
-        assert_eq!(params[1], ("b".into(), "bar".into()));
+        assert_eq!(
+            params.as_ref().map(|p| &p[0]),
+            UrlContext::new(&("a".into(), "foo".into()))
+        );
+        assert_eq!(
+            params.as_ref().map(|p| &p[1]),
+            UrlContext::new(&("b".into(), "bar".into()))
+        );
     }
 
     #[test]
@@ -302,89 +321,126 @@ mod tests {
             StaticSegment("bar"),
             WildcardSegment("rest"),
         );
-        let matched = def.test(path).expect("couldn't match route");
-        assert_eq!(matched.matched(), "/foo/bar/////");
-        assert_eq!(matched.remaining(), "");
+        let matched = def
+            .test(UrlContext::new(path))
+            .expect("couldn't match route");
+        assert_eq!(matched.matched(), UrlContext::new("/foo/bar/////"));
+        assert_eq!(matched.remaining(), UrlContext::new(""));
         let params = matched.params();
-        assert_eq!(params[0], ("rest".into(), "////".into()));
+        assert_eq!(
+            params.as_ref().map(|p| &p[0]),
+            UrlContext::new(&("rest".into(), "////".into()))
+        );
     }
 
     #[test]
     fn optional_param_can_match() {
         let path = "/foo";
         let def = OptionalParamSegment("a");
-        let matched = def.test(path).expect("couldn't match route");
-        assert_eq!(matched.matched(), "/foo");
-        assert_eq!(matched.remaining(), "");
+        let matched = def
+            .test(UrlContext::new(path))
+            .expect("couldn't match route");
+        assert_eq!(matched.matched(), UrlContext::new("/foo"));
+        assert_eq!(matched.remaining(), UrlContext::new(""));
         let params = matched.params();
-        assert_eq!(params[0], ("a".into(), "foo".into()));
+        assert_eq!(
+            params.as_ref().map(|p| &p[0]),
+            UrlContext::new(&("a".into(), "foo".into()))
+        );
     }
 
     #[test]
     fn optional_param_can_not_match() {
         let path = "/";
         let def = OptionalParamSegment("a");
-        let matched = def.test(path).expect("couldn't match route");
-        assert_eq!(matched.matched(), "");
-        assert_eq!(matched.remaining(), "/");
+        let matched = def
+            .test(UrlContext::new(path))
+            .expect("couldn't match route");
+        assert_eq!(matched.matched(), UrlContext::new(""));
+        assert_eq!(matched.remaining(), UrlContext::new("/"));
         let params = matched.params();
-        assert_eq!(params.first(), None);
+        assert_eq!(params.map(|p| p.first()), UrlContext::new(None));
     }
 
     #[test]
     fn optional_params_match_first() {
         let path = "/foo";
         let def = (OptionalParamSegment("a"), OptionalParamSegment("b"));
-        let matched = def.test(path).expect("couldn't match route");
-        assert_eq!(matched.matched(), "/foo");
-        assert_eq!(matched.remaining(), "");
+        let matched = def
+            .test(UrlContext::new(path))
+            .expect("couldn't match route");
+        assert_eq!(matched.matched(), UrlContext::new("/foo"));
+        assert_eq!(matched.remaining(), UrlContext::new(""));
         let params = matched.params();
-        assert_eq!(params[0], ("a".into(), "foo".into()));
+        assert_eq!(
+            params.as_ref().map(|p| &p[0]),
+            UrlContext::new(&("a".into(), "foo".into()))
+        );
     }
 
     #[test]
     fn optional_params_can_match_both() {
         let path = "/foo/bar";
         let def = (OptionalParamSegment("a"), OptionalParamSegment("b"));
-        let matched = def.test(path).expect("couldn't match route");
-        assert_eq!(matched.matched(), "/foo/bar");
-        assert_eq!(matched.remaining(), "");
+        let matched = def
+            .test(UrlContext::new(path))
+            .expect("couldn't match route");
+        assert_eq!(matched.matched(), UrlContext::new("/foo/bar"));
+        assert_eq!(matched.remaining(), UrlContext::new(""));
         let params = matched.params();
-        assert_eq!(params[0], ("a".into(), "foo".into()));
-        assert_eq!(params[1], ("b".into(), "bar".into()));
+        assert_eq!(
+            params.as_ref().map(|p| &p[0]),
+            UrlContext::new(&("a".into(), "foo".into()))
+        );
+        assert_eq!(
+            params.as_ref().map(|p| &p[1]),
+            UrlContext::new(&("b".into(), "bar".into()))
+        );
     }
 
     #[test]
     fn matching_after_optional_param() {
         let path = "/bar";
         let def = (OptionalParamSegment("a"), StaticSegment("bar"));
-        let matched = def.test(path).expect("couldn't match route");
-        assert_eq!(matched.matched(), "/bar");
-        assert_eq!(matched.remaining(), "");
+        let matched = def
+            .test(UrlContext::new(path))
+            .expect("couldn't match route");
+        assert_eq!(matched.matched(), UrlContext::new("/bar"));
+        assert_eq!(matched.remaining(), UrlContext::new(""));
         let params = matched.params();
-        assert!(params.is_empty());
+        assert!(params.test(|p| p.is_empty()));
     }
 
     #[test]
     fn static_before_param() {
         let path = "/foo/bar";
         let def = (StaticSegment("foo"), ParamSegment("b"));
-        let matched = def.test(path).expect("couldn't match route");
-        assert_eq!(matched.matched(), "/foo/bar");
-        assert_eq!(matched.remaining(), "");
+        let matched = def
+            .test(UrlContext::new(path))
+            .expect("couldn't match route");
+        assert_eq!(matched.matched(), UrlContext::new("/foo/bar"));
+        assert_eq!(matched.remaining(), UrlContext::new(""));
         let params = matched.params();
-        assert_eq!(params[0], ("b".into(), "bar".into()));
+        assert_eq!(
+            params.as_ref().map(|p| &p[0]),
+            UrlContext::new(&("b".into(), "bar".into()))
+        );
     }
 
     #[test]
     fn static_before_optional_param() {
         let path = "/foo/bar";
         let def = (StaticSegment("foo"), OptionalParamSegment("b"));
-        let matched = def.test(path).expect("couldn't match route");
-        assert_eq!(matched.matched(), "/foo/bar");
-        assert_eq!(matched.remaining(), "");
+        let matched = def
+            .test(UrlContext::new(path))
+            .expect("couldn't match route");
+        assert_eq!(matched.matched(), UrlContext::new("/foo/bar"));
+        assert_eq!(matched.remaining(), UrlContext::new(""));
         let params = matched.params();
-        assert_eq!(params[0], ("b".into(), "bar".into()));
+        assert_eq!(
+            params.as_ref().map(|p| &p[0]),
+            UrlContext::new(&("b".into(), "bar".into()))
+        );
     }
 
     #[test]
@@ -395,11 +451,16 @@ mod tests {
             OptionalParamSegment("b"),
             StaticSegment("bar"),
         );
-        let matched = def.test(path).expect("couldn't match route");
-        assert_eq!(matched.matched(), "/foo/bar");
-        assert_eq!(matched.remaining(), "");
+        let matched = def
+            .test(UrlContext::new(path))
+            .expect("couldn't match route");
+        assert_eq!(matched.matched(), UrlContext::new("/foo/bar"));
+        assert_eq!(matched.remaining(), UrlContext::new(""));
         let params = matched.params();
-        assert_eq!(params[0], ("a".into(), "foo".into()));
+        assert_eq!(
+            params.as_ref().map(|p| &p[0]),
+            UrlContext::new(&("a".into(), "foo".into()))
+        );
     }
 
     #[test]
@@ -410,11 +471,19 @@ mod tests {
             OptionalParamSegment("b"),
             StaticSegment("bar"),
         );
-        let matched = def.test(path).expect("couldn't match route");
-        assert_eq!(matched.matched(), "/foo/qux/bar");
-        assert_eq!(matched.remaining(), "");
+        let matched = def
+            .test(UrlContext::new(path))
+            .expect("couldn't match route");
+        assert_eq!(matched.matched(), UrlContext::new("/foo/qux/bar"));
+        assert_eq!(matched.remaining(), UrlContext::new(""));
         let params = matched.params();
-        assert_eq!(params[0], ("a".into(), "foo".into()));
-        assert_eq!(params[1], ("b".into(), "qux".into()));
+        assert_eq!(
+            params.as_ref().map(|p| &p[0]),
+            UrlContext::new(&("a".into(), "foo".into()))
+        );
+        assert_eq!(
+            params.as_ref().map(|p| &p[1]),
+            UrlContext::new(&("b".into(), "qux".into()))
+        );
     }
 }

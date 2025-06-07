@@ -396,7 +396,7 @@ impl<C: UrlContextType> UrlContext<C, Url> {
 
         #[cfg(feature = "ssr")]
         {
-            s.map(|s| Self::unescape(s))
+            Self::unescape(s)
         }
     }
 }
