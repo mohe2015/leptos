@@ -359,7 +359,7 @@ mod tests {
         assert_eq!(matched.matched(), UrlContext::new(""));
         assert_eq!(matched.remaining(), UrlContext::new("/"));
         let params = matched.params();
-        assert_eq!(params.map(|p| p.first()), UrlContext::new(None));
+        assert_eq!(params.as_ref().map(|p| p.first()), UrlContext::new(None));
     }
 
     #[test]
