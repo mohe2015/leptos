@@ -3,7 +3,7 @@
 use any_spawner::Executor;
 use core::fmt::Debug;
 use dyn_clone::DynClone;
-use js_sys::Reflect;
+use js_sys::{try_iter, Array, JsString, Reflect};
 use leptos::server::ServerActionError;
 use reactive_graph::{
     computed::Memo,
@@ -71,6 +71,7 @@ impl<C: UrlContextType, T> UrlContext<C, T> {
     pub fn change_context<C2: UrlContextType>(
         self,
         _context: C,
+        _context2: C2,
     ) -> UrlContext<C2, T> {
         UrlContext(self.0, PhantomData)
     }
@@ -221,11 +222,11 @@ impl<'a, C: UrlContextType, T1, T2, T3>
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Url {
-    origin: String,
-    path: String,
-    search: String,
-    search_params: ParamsMap,
-    hash: String,
+    pub(crate) origin: String,
+    pub(crate) path: String,
+    pub(crate) search: String,
+    pub(crate) search_params: ParamsMap,
+    pub(crate) hash: String,
 }
 
 // these are currently needed so the public api does not change too much
@@ -272,6 +273,67 @@ impl Url {
 }
 
 impl<C: UrlContextType> UrlContext<C, Url> {
+    pub fn parse(url: UrlContext<C, &str>) -> Self {
+        let location = url.map(|url| web_sys::Url::new(url).unwrap());
+        location.map(|location| {
+            Url {
+                origin: location.origin(),
+                path: location.pathname(),
+                search: location
+                    .search()
+                    .strip_prefix('?')
+                    .map(String::from)
+                    .unwrap_or_default(),
+                search_params: search_params_from_web_url(
+                    &location.search_params(),
+                )
+                .unwrap(), // TODO FIXME unwrap
+                hash: location.hash(),
+            }
+        })
+    }
+
+    pub fn parse_with_default_base(url: UrlContext<C, &str>) -> Self {
+        Self::parse_with_base(
+            url,
+            UrlContext::new(
+                BrowserUrlContext,
+                &window().location().origin().unwrap(),
+            ),
+        )
+    }
+
+    pub fn parse_with_base(
+        url: UrlContext<C, &str>,
+        base: UrlContext<BrowserUrlContext, &str>,
+    ) -> Self {
+        let location = base.as_ref().map(|base| {
+            web_sys::Url::new_with_base(
+                url.forget_context(C::produce_from_thin_air()),
+                base,
+            )
+            .unwrap()
+        });
+        location
+            .map(|location| {
+                Url {
+                    origin: location.origin(),
+                    path: location.pathname(),
+                    search: location
+                        .search()
+                        .strip_prefix('?')
+                        .map(String::from)
+                        .unwrap_or_default(),
+                    search_params: search_params_from_web_url(
+                        &location.search_params(),
+                    )
+                    .unwrap(), // TODO FIXME unwrap
+                    hash: location.hash(),
+                }
+            })
+            .change_context(BrowserUrlContext, C::produce_from_thin_air())
+    }
+
     pub fn origin(&self) -> UrlContext<C, &str> {
         self.as_ref().map(|u| u.origin.as_str())
     }
@@ -494,18 +556,15 @@ pub trait Routing: DynClone + Send + Sync + 'static {
     /// Update the browser's history to reflect a new location.
     fn complete_navigation(&self, loc: &LocationChange);
 
-    fn parse(
+    fn browser_to_router_url(
         &self,
-        url: UrlContext<RouterUrlContext, &str>,
-    ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
-        self.parse_with_base(url, *BASE)
-    }
-
-    fn parse_with_base(
-        &self,
-        url: UrlContext<RouterUrlContext, &str>,
-        base: UrlContext<BrowserUrlContext, &str>,
+        url: UrlContext<BrowserUrlContext, Url>,
     ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error>;
+
+    fn router_to_browser_url(
+        &self,
+        url: UrlContext<RouterUrlContext, Url>,
+    ) -> Result<UrlContext<BrowserUrlContext, Url>, Self::Error>;
 
     fn redirect(&self, loc: &UrlContext<RouterUrlContext, &str>);
 
@@ -541,16 +600,22 @@ impl Routing for Box<dyn Routing<Error = JsValue> + '_> {
         (**self).is_back()
     }
 
-    fn parse_with_base(
-        &self,
-        url: UrlContext<RouterUrlContext, &str>,
-        base: UrlContext<BrowserUrlContext, &str>,
-    ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
-        (**self).parse_with_base(url, base)
-    }
-
     fn redirect(&self, loc: &UrlContext<RouterUrlContext, &str>) {
         (**self).redirect(loc);
+    }
+
+    fn browser_to_router_url(
+        &self,
+        url: UrlContext<BrowserUrlContext, Url>,
+    ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
+        (**self).browser_to_router_url(url)
+    }
+
+    fn router_to_browser_url(
+        &self,
+        url: UrlContext<RouterUrlContext, Url>,
+    ) -> Result<UrlContext<BrowserUrlContext, Url>, Self::Error> {
+        (**self).router_to_browser_url(url)
     }
 }
 
@@ -643,10 +708,12 @@ where
             }
 
             let url = routing
-                .parse_with_base(
+                .browser_to_router_url(
                     // TODO FIXME context is wrong
-                    UrlContext::new(RouterUrlContext, href.as_str()),
-                    origin.as_ref().map(|origin| origin.as_str()),
+                    UrlContext::parse_with_base(
+                        UrlContext::new(BrowserUrlContext, href.as_str()),
+                        origin.as_ref().map(|origin| origin.as_str()),
+                    ),
                 )
                 .unwrap();
             let path_name =
@@ -660,7 +727,7 @@ where
                 != origin
                     .as_ref()
                     .map(|o| o.as_str())
-                    .change_context(BrowserUrlContext)
+                    .change_context(BrowserUrlContext, RouterUrlContext)
                 || (!router_base.as_ref().test(|router_base| router_base.is_empty())
                     && !path_name.as_ref().test(|path_name| path_name.is_empty())
                     // NOTE: the two `to_lowercase()` calls here added a total of about 14kb to
@@ -719,4 +786,22 @@ where
 
         Ok(())
     })
+}
+
+pub(crate) fn search_params_from_web_url(
+    params: &web_sys::UrlSearchParams,
+) -> Result<ParamsMap, JsValue> {
+    try_iter(params)?
+        .into_iter()
+        .flatten()
+        .map(|pair| {
+            pair.and_then(|pair| {
+                let row = pair.dyn_into::<Array>()?;
+                Ok((
+                    String::from(row.get(0).dyn_into::<JsString>()?),
+                    String::from(row.get(1).dyn_into::<JsString>()?),
+                ))
+            })
+        })
+        .collect()
 }

@@ -1,5 +1,5 @@
 use crate::{
-    components::{RouterContext, ToHref},
+    components::ToHref,
     hooks::{has_router, use_navigate, use_resolved_path},
     location::{
         BrowserUrlContext, RouterUrlContext, UrlContext, UrlContexty as _,
@@ -102,10 +102,8 @@ where
     ) -> impl IntoView {
         let action_version = version;
         let navigate = has_router.then(use_navigate);
-        let cx = use_context::<RouterContext>().expect("no router");
         let on_submit = {
             move |ev: web_sys::SubmitEvent| {
-                let cx = cx.clone();
                 let navigate = navigate.clone();
                 if ev.default_prevented() {
                     return;
@@ -163,60 +161,53 @@ where
                                 // get returned from a server function
                                 if resp.redirected() {
                                     let resp_url = &resp.url();
-                                    match cx
-                                        .location_provider
-                                        .as_ref()
-                                        .unwrap()
-                                        .parse(UrlContext::new(
-                                            // TODO FIXME
+                                    let url =
+                                        UrlContext::parse(UrlContext::new(
                                             RouterUrlContext,
                                             resp_url.as_str(),
-                                        )) {
-                                        Ok(url) => {
-                                            if url.origin()
-                                                != current_window_origin()
-                                                    .as_ref()
-                                                    .map(|s| s.as_str())
-                                                    .change_context(
-                                                        BrowserUrlContext,
-                                                    )
-                                                || navigate.is_none()
-                                            {
-                                                _ = window()
-                                                    .location()
-                                                    .set_href(
-                                                        resp_url.as_str(),
-                                                    );
-                                            } else {
-                                                #[allow(
-                                                    clippy::unnecessary_unwrap
-                                                )]
-                                                let navigate =
-                                                    navigate.unwrap();
-                                                navigate(
-                                                    url.path().map(|path| {
-                                                        url.search().map(
-                                                            |search| {
-                                                                format!(
-                                                                    "{}{}{}",
-                                                                    path,
-                                                                    if search
-                                                                        .is_empty()
-                                                                    {
-                                                                        ""
-                                                                    } else {
-                                                                        "?"
-                                                                    },
-                                                                    search,
-                                                                )
+                                        ));
+
+                                    if url.origin()
+                                        != current_window_origin()
+                                            .as_ref()
+                                            .map(|s| s.as_str())
+                                            .change_context(
+                                                BrowserUrlContext,
+                                                RouterUrlContext,
+                                            )
+                                        || navigate.is_none()
+                                    {
+                                        _ = window()
+                                            .location()
+                                            .set_href(resp_url.as_str());
+                                    } else {
+                                        #[allow(clippy::unnecessary_unwrap)]
+                                        let navigate = navigate.unwrap();
+                                        navigate(
+                                            url.path()
+                                                .map(|path| {
+                                                    url.search().map(|search| {
+                                                        format!(
+                                                            "{}{}{}",
+                                                            path,
+                                                            if search.is_empty()
+                                                            {
+                                                                ""
+                                                            } else {
+                                                                "?"
                                                             },
+                                                            search,
                                                         )
-                                                    }).flatten().as_ref().map(|v| v.as_str()).forget_context(RouterUrlContext),
-                                                    navigate_options,
-                                                )
-                                            }
-                                        }
-                                        Err(e) => warn!("{:?}", e),
+                                                    })
+                                                })
+                                                .flatten()
+                                                .as_ref()
+                                                .map(|v| v.as_str())
+                                                .forget_context(
+                                                    RouterUrlContext,
+                                                ),
+                                            navigate_options,
+                                        )
                                     }
                                 }
                             }
@@ -257,69 +248,52 @@ where
                                 // get returned from a server function
                                 if resp.redirected() {
                                     let resp_url = &resp.url();
-                                    match cx
-                                        .location_provider
-                                        .as_ref()
-                                        .unwrap()
-                                        .parse(
-                                            // TODO FIXME
-                                            UrlContext::new(
+                                    let url =
+                                        UrlContext::parse(UrlContext::new(
+                                            RouterUrlContext,
+                                            resp_url.as_str(),
+                                        ));
+                                    if url.origin()
+                                        != current_window_origin()
+                                            .as_ref()
+                                            .map(|v| v.as_str())
+                                            .change_context(
+                                                BrowserUrlContext,
                                                 RouterUrlContext,
-                                                resp_url.as_str(),
-                                            ),
-                                        ) {
-                                        Ok(url) => {
-                                            if url.origin()
-                                                != current_window_origin()
-                                                    .as_ref()
-                                                    .map(|v| v.as_str())
-                                                    .change_context(
-                                                        BrowserUrlContext,
-                                                    )
-                                                || navigate.is_none()
-                                            {
-                                                _ = window()
-                                                    .location()
-                                                    .set_href(
-                                                        resp_url.as_str(),
-                                                    );
-                                            } else {
-                                                #[allow(
-                                                    clippy::unnecessary_unwrap
-                                                )]
-                                                let navigate =
-                                                    navigate.unwrap();
-                                                navigate(
-                                                    url.path()
-                                                        .map(|path| {
-                                                            url.search().map(
-                                                                |search| {
-                                                                    format!(
-                                                                "{}{}{}",
-                                                                path,
-                                                                if search
-                                                                    .is_empty()
-                                                                {
-                                                                    ""
-                                                                } else {
-                                                                    "?"
-                                                                },
-                                                                search,
-                                                            )
-                                                                },
-                                                            )
-                                                        })
-                                                        .flatten()
-                                                        .as_ref()
-                                                        .map(|v| v.as_str())
-                                                        .forget_context(
-                                                            RouterUrlContext,
-                                                        ),
-                                                    navigate_options,
-                                                )
-                                            }
-                                        }
-                                        Err(e) => warn!("{:?}", e),
+                                            )
+                                        || navigate.is_none()
+                                    {
+                                        _ = window()
+                                            .location()
+                                            .set_href(resp_url.as_str());
+                                    } else {
+                                        #[allow(clippy::unnecessary_unwrap)]
+                                        let navigate = navigate.unwrap();
+                                        navigate(
+                                            url.path()
+                                                .map(|path| {
+                                                    url.search().map(|search| {
+                                                        format!(
+                                                            "{}{}{}",
+                                                            path,
+                                                            if search.is_empty()
+                                                            {
+                                                                ""
+                                                            } else {
+                                                                "?"
+                                                            },
+                                                            search,
+                                                        )
+                                                    })
+                                                })
+                                                .flatten()
+                                                .as_ref()
+                                                .map(|v| v.as_str())
+                                                .forget_context(
+                                                    RouterUrlContext,
+                                                ),
+                                            navigate_options,
+                                        )
                                     }
                                 }
                             }

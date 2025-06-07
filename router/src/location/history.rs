@@ -2,14 +2,12 @@ use super::{handle_anchor_click, LocationChange, Url};
 use crate::{
     hooks::use_navigate,
     location::{
-        BrowserUrlContext, RouterUrlContext, Routing, RoutingProvider,
-        UrlContext, UrlContexty as _,
+        search_params_from_web_url, BrowserUrlContext, RouterUrlContext,
+        Routing, RoutingProvider, UrlContext, UrlContexty as _,
     },
-    params::ParamsMap,
 };
 use core::fmt;
 use futures::channel::oneshot;
-use js_sys::{try_iter, Array, JsString};
 use leptos::prelude::*;
 use or_poisoned::OrPoisoned;
 use reactive_graph::{
@@ -107,46 +105,18 @@ impl Routing for BrowserRouter {
         &self.url
     }
 
-    fn parse(
+    fn browser_to_router_url(
         &self,
-        url: UrlContext<RouterUrlContext, &str>,
+        url: UrlContext<BrowserUrlContext, Url>,
     ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
-        let base =
-            UrlContext::new(BrowserUrlContext, window().location().origin()?);
-        self.parse_with_base(url, base.as_ref().map(|base| base.as_str()))
+        Ok(url.change_context(BrowserUrlContext, RouterUrlContext))
     }
 
-    fn parse_with_base(
+    fn router_to_browser_url(
         &self,
-        url: UrlContext<RouterUrlContext, &str>,
-        base: UrlContext<BrowserUrlContext, &str>,
-    ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
-        // TODO FIXME unwrap
-        let location = base.as_ref().map(|base| {
-            web_sys::Url::new_with_base(
-                url.forget_context(RouterUrlContext),
-                base,
-            )
-            .unwrap()
-        });
-        Ok(location
-            .map(|location| {
-                Url {
-                    origin: location.origin(),
-                    path: location.pathname(),
-                    search: location
-                        .search()
-                        .strip_prefix('?')
-                        .map(String::from)
-                        .unwrap_or_default(),
-                    search_params: search_params_from_web_url(
-                        &location.search_params(),
-                    )
-                    .unwrap(), // TODO FIXME unwrap
-                    hash: location.hash(),
-                }
-            })
-            .change_context(BrowserUrlContext))
+        url: UrlContext<RouterUrlContext, Url>,
+    ) -> Result<UrlContext<BrowserUrlContext, Url>, Self::Error> {
+        Ok(url.change_context(RouterUrlContext, BrowserUrlContext))
     }
 
     fn init(
@@ -297,7 +267,8 @@ impl Routing for BrowserRouter {
         let current_origin =
             UrlContext::new(BrowserUrlContext, location().origin().unwrap());
         if url.as_ref().map(|url| url.origin())
-            == current_origin.change_context(BrowserUrlContext)
+            == current_origin
+                .change_context(BrowserUrlContext, RouterUrlContext)
         {
             let navigate = navigate.clone();
             // delay by a tick here, so that the Action updates *before* the redirect
@@ -321,24 +292,6 @@ impl Routing for BrowserRouter {
     fn is_back(&self) -> ReadSignal<bool> {
         self.is_back.read_only().into()
     }
-}
-
-fn search_params_from_web_url(
-    params: &web_sys::UrlSearchParams,
-) -> Result<ParamsMap, JsValue> {
-    try_iter(params)?
-        .into_iter()
-        .flatten()
-        .map(|pair| {
-            pair.and_then(|pair| {
-                let row = pair.dyn_into::<Array>()?;
-                Ok((
-                    String::from(row.get(0).dyn_into::<JsString>()?),
-                    String::from(row.get(1).dyn_into::<JsString>()?),
-                ))
-            })
-        })
-        .collect()
 }
 
 /// Resolves a redirect location to an (absolute) URL.

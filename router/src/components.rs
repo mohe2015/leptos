@@ -1,7 +1,9 @@
 pub use super::{form::*, link::*};
 #[cfg(feature = "ssr")]
 use crate::location::RequestUrl;
-use crate::location::RoutingProvider;
+use crate::location::{
+    search_params_from_web_url, BrowserUrlContext, RoutingProvider, BASE,
+};
 pub use crate::nested_router::Outlet;
 use crate::{
     flat_router::FlatRoutesView,
@@ -157,6 +159,7 @@ impl RouterContext {
                 // TODO this should be relative to the current *Route*, I think...
                 current.path().map(|path| Some(path)),
             )
+            // TODO here
         } else {
             resolve_path(
                 UrlContext::new(RouterUrlContext, ""),
@@ -165,18 +168,36 @@ impl RouterContext {
             )
         };
 
-        let mut url = match self
-            .location_provider
-            .as_ref()
-            .unwrap()
-            .parse(resolved_to.as_ref().map(|r| &**r))
-        {
-            Ok(url) => url,
-            Err(e) => {
-                leptos::logging::error!("Error parsing URL: {e:?}");
-                return;
-            }
+        let mut url = {
+            let url = resolved_to.as_ref().map(|r| &**r);
+            let base = &BASE;
+            let location = base.as_ref().map(|base| {
+                web_sys::Url::new_with_base(
+                    url.forget_context(RouterUrlContext),
+                    base,
+                )
+                .unwrap()
+            });
+            location
+                .map(|location| {
+                    Url {
+                        origin: location.origin(),
+                        path: location.pathname(),
+                        search: location
+                            .search()
+                            .strip_prefix('?')
+                            .map(String::from)
+                            .unwrap_or_default(),
+                        search_params: search_params_from_web_url(
+                            &location.search_params(),
+                        )
+                        .unwrap(), // TODO FIXME unwrap
+                        hash: location.hash(),
+                    }
+                })
+                .change_context(BrowserUrlContext, RouterUrlContext)
         };
+
         let query_mutations =
             mem::take(&mut *self.query_mutations.write_value());
         if !query_mutations.is_empty() {
