@@ -4,12 +4,9 @@ use any_spawner::Executor;
 use core::fmt::Debug;
 use dyn_clone::DynClone;
 use js_sys::{try_iter, Array, JsString, Reflect};
-use leptos::server::ServerActionError;
+use leptos::{prelude::Signal, server::ServerActionError};
 use reactive_graph::{
-    computed::Memo,
-    owner::provide_context,
-    signal::{ArcRwSignal, ReadSignal},
-    traits::With,
+    computed::Memo, owner::provide_context, signal::ReadSignal, traits::With,
 };
 use send_wrapper::SendWrapper;
 use std::{borrow::Cow, future::Future, marker::PhantomData, sync::LazyLock};
@@ -550,14 +547,12 @@ impl Default for LocationChange {
 
 pub trait RoutingProvider: Routing + Clone {
     fn new() -> Result<Self, Self::Error>;
-
-    fn current() -> Result<UrlContext<RouterUrlContext, Url>, Self::Error>;
 }
 
 pub trait Routing: DynClone + Send + Sync + 'static {
     type Error: Debug;
 
-    fn as_url(&self) -> &ArcRwSignal<UrlContext<RouterUrlContext, Url>>;
+    fn as_url(&self) -> Signal<UrlContext<RouterUrlContext, Url>>;
 
     /// Sets up any global event listeners or other initialization needed.
     fn init(
@@ -593,7 +588,7 @@ dyn_clone::clone_trait_object!(Routing<Error = JsValue>);
 impl Routing for Box<dyn Routing<Error = JsValue> + '_> {
     type Error = JsValue;
 
-    fn as_url(&self) -> &ArcRwSignal<UrlContext<RouterUrlContext, Url>> {
+    fn as_url(&self) -> Signal<UrlContext<RouterUrlContext, Url>> {
         (**self).as_url()
     }
 
@@ -673,7 +668,7 @@ pub(crate) fn handle_anchor_click<NavFn, NavFut>(
     navigate: NavFn,
 ) -> Box<dyn Fn(Event) -> Result<(), JsValue>>
 where
-    NavFn: Fn(UrlContext<RouterUrlContext, Url>, LocationChange) -> NavFut
+    NavFn: Fn(UrlContext<BrowserUrlContext, Url>, LocationChange) -> NavFut
         + 'static,
     NavFut: Future<Output = ()> + 'static,
 {
@@ -732,23 +727,20 @@ where
                     ),
                 )
                 .unwrap();
-            let path_name =
-                UrlContext::<RouterUrlContext, Url>::unescape_minimal(
-                    url.path(),
-                );
 
             // let browser handle this event if it leaves our domain
             // or our base path
+            // TODO FIXME check that the base check here also works for the hash router
             if url.origin()
                 != origin
                     .as_ref()
                     .map(|o| o.as_str())
                     .change_context(BrowserUrlContext, RouterUrlContext)
                 || (!router_base.as_ref().test(|router_base| router_base.is_empty())
-                    && !path_name.as_ref().test(|path_name| path_name.is_empty())
+                    && !url.path().as_ref().test(|path_name| path_name.is_empty())
                     // NOTE: the two `to_lowercase()` calls here added a total of about 14kb to
                     // release binary size, for limited gain
-                    && !path_name.as_ref().test(|path_name| path_name.starts_with(&**router_base.as_ref().forget_context(RouterUrlContext))))
+                    && !url.path().as_ref().test(|path_name| path_name.starts_with(&**router_base.as_ref().forget_context(RouterUrlContext))))
             {
                 return Ok(());
             }
@@ -756,24 +748,7 @@ where
             // we've passed all the checks to navigate on the client side, so we prevent the
             // default behavior of the click
             ev.prevent_default();
-            let to = path_name.map(|path_name| {
-                path_name
-                    + if url
-                        .search()
-                        .forget_context(RouterUrlContext)
-                        .is_empty()
-                    {
-                        ""
-                    } else {
-                        "?"
-                    }
-                    + &UrlContext::<RouterUrlContext, Url>::unescape(
-                        url.search(),
-                    )
-                    .forget_context(RouterUrlContext)
-                    + &UrlContext::<RouterUrlContext, Url>::unescape(url.hash())
-                        .forget_context(RouterUrlContext)
-            });
+
             let state = Reflect::get(&a, &JsValue::from_str("state"))
                 .ok()
                 .and_then(|value| {
@@ -790,14 +765,20 @@ where
                 .unwrap_or(false);
 
             let change = LocationChange {
-                value: to,
+                value: url.to_full_path(),
                 replace,
                 scroll: !a.has_attribute("noscroll")
                     && !a.has_attribute("data-noscroll"),
                 state: State::new(state),
             };
 
-            Executor::spawn_local(navigate(url, change));
+            Executor::spawn_local(navigate(
+                UrlContext::parse_with_base(
+                    UrlContext::new(BrowserUrlContext, href.as_str()),
+                    origin.as_ref().map(|origin| origin.as_str()),
+                ),
+                change,
+            ));
         }
 
         Ok(())

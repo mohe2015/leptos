@@ -22,14 +22,14 @@ use std::{
 };
 use tachys::dom::{document, window};
 use wasm_bindgen::{closure::Closure, JsCast, JsValue};
-use web_sys::{console, Event};
+use web_sys::Event;
 
 #[derive(Clone)]
 pub struct HashRouter {
-    url: ArcRwSignal<UrlContext<RouterUrlContext, Url>>,
+    url: ArcRwSignal<UrlContext<BrowserUrlContext, Url>>,
     pub(crate) pending_navigation: Arc<Mutex<Option<oneshot::Sender<()>>>>,
     pub(crate) path_stack:
-        ArcStoredValue<Vec<UrlContext<RouterUrlContext, Url>>>,
+        ArcStoredValue<Vec<UrlContext<BrowserUrlContext, Url>>>,
     pub(crate) is_back: ArcRwSignal<bool>,
 }
 
@@ -64,17 +64,13 @@ impl HashRouter {
 
 impl RoutingProvider for HashRouter {
     fn new() -> Result<Self, JsValue> {
-        let url = ArcRwSignal::new(Self::current()?);
-        console::log_1(
-            &format!(
-                "{:?}",
-                url.get_untracked().forget_context(RouterUrlContext)
-            )
-            .into(),
-        );
-        let path_stack = ArcStoredValue::new(
-            Self::current().map(|n| vec![n]).unwrap_or_default(),
-        );
+        let url = ArcRwSignal::new(UrlContext::parse(UrlContext::new(
+            BrowserUrlContext,
+            &window().location().href()?,
+        )));
+        let path_stack = ArcStoredValue::new(vec![UrlContext::parse(
+            UrlContext::new(BrowserUrlContext, &window().location().href()?),
+        )]);
         Ok(Self {
             url,
             pending_navigation: Default::default(),
@@ -82,24 +78,21 @@ impl RoutingProvider for HashRouter {
             is_back: Default::default(),
         })
     }
-
-    fn current() -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
-        // TODO add context
-        let location = window().location();
-        // base is location.path();
-        let new = location.hash()?.trim_start_matches("#").to_owned();
-        Ok(UrlContext::parse(UrlContext::new(
-            RouterUrlContext,
-            &(location.origin()? + &new),
-        )))
-    }
 }
 
 impl Routing for HashRouter {
     type Error = JsValue;
 
-    fn as_url(&self) -> &ArcRwSignal<UrlContext<RouterUrlContext, Url>> {
-        &self.url
+    fn as_url(&self) -> Signal<UrlContext<RouterUrlContext, Url>> {
+        let url = self.url.clone();
+        Signal::derive(move || {
+            let mut url = url.get();
+            url.map_mut(|url| {
+                url.path = url.hash.strip_prefix('#').unwrap_or("/").to_owned();
+                url.hash = String::new();
+            });
+            url.change_context(BrowserUrlContext, RouterUrlContext)
+        })
     }
 
     fn browser_to_router_url(
@@ -128,12 +121,11 @@ impl Routing for HashRouter {
         &self,
         base: UrlContext<RouterUrlContext, Option<Cow<'static, str>>>,
     ) {
-        let window = window();
         let navigate = {
             let url = self.url.clone();
             let pending = Arc::clone(&self.pending_navigation);
             let this = self.clone();
-            move |new_url: UrlContext<RouterUrlContext, Url>, loc| {
+            move |new_url: UrlContext<BrowserUrlContext, Url>, loc| {
                 let same_path = {
                     let curr = url.read_untracked();
                     curr.origin() == new_url.origin()
@@ -180,7 +172,7 @@ impl Routing for HashRouter {
             }
         }) as Box<dyn FnMut(Event)>)
         .into_js_value();
-        window
+        window()
             .add_event_listener_with_callback(
                 "click",
                 closure.as_ref().unchecked_ref(),
@@ -195,30 +187,24 @@ impl Routing for HashRouter {
             let url = self.url.clone();
             let path_stack = self.path_stack.clone();
             let is_back = self.is_back.clone();
-            move || match Self::current() {
-                Ok(new_url) => {
-                    let stack = path_stack.read_value();
-                    let is_navigating_back = stack.len() == 1
-                        || (stack.len() >= 2
-                            && stack.get(stack.len() - 2) == Some(&new_url));
+            move || {
+                let new_url = UrlContext::parse(UrlContext::new(
+                    BrowserUrlContext,
+                    &window().location().href().unwrap(),
+                ));
+                let stack = path_stack.read_value();
+                let is_navigating_back = stack.len() == 1
+                    || (stack.len() >= 2
+                        && stack.get(stack.len() - 2) == Some(&new_url));
 
-                    is_back.set(is_navigating_back);
+                is_back.set(is_navigating_back);
 
-                    // maybe this fails if two updates are happening in same tick?
-                    assert!(!url.is_disposed());
-                    url.set(new_url);
-                }
-                Err(e) => {
-                    #[cfg(feature = "tracing")]
-                    tracing::error!("{e:?}");
-                    #[cfg(not(feature = "tracing"))]
-                    web_sys::console::error_1(&e);
-                }
+                url.set(new_url);
             }
         };
         let closure =
             Closure::wrap(Box::new(cb) as Box<dyn Fn()>).into_js_value();
-        window
+        window()
             .add_event_listener_with_callback(
                 "popstate",
                 closure.as_ref().unchecked_ref(),
@@ -259,10 +245,12 @@ impl Routing for HashRouter {
 
         // add this URL to the "path stack" for detecting back navigations, and
         // unset "navigating back" state
-        if let Ok(url) = Self::current() {
-            self.path_stack.write_value().push(url);
-            self.is_back.set(false);
-        }
+        let url = UrlContext::parse(UrlContext::new(
+            BrowserUrlContext,
+            &window().location().href().unwrap(),
+        ));
+        self.path_stack.write_value().push(url);
+        self.is_back.set(false);
 
         // scroll to el
         Self::scroll_to_el(loc.scroll);
