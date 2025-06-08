@@ -22,7 +22,7 @@ use std::{
 };
 use tachys::dom::{document, window};
 use wasm_bindgen::{closure::Closure, JsCast, JsValue};
-use web_sys::{Event, UrlSearchParams};
+use web_sys::{console, Event, UrlSearchParams};
 
 #[derive(Clone)]
 pub struct HashRouter {
@@ -65,6 +65,9 @@ impl HashRouter {
 impl RoutingProvider for HashRouter {
     fn new() -> Result<Self, JsValue> {
         let url = ArcRwSignal::new(Self::current()?);
+        console::log_1(
+            &format!("{:?}", url.get().forget_context(RouterUrlContext)).into(),
+        );
         let path_stack = ArcStoredValue::new(
             Self::current().map(|n| vec![n]).unwrap_or_default(),
         );
@@ -77,24 +80,14 @@ impl RoutingProvider for HashRouter {
     }
 
     fn current() -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
-        let location = window().location(); // TODO add context
-        Ok(UrlContext::new(
+        // TODO add context
+        let location = window().location();
+        // base is location.path();
+        let new = location.hash()?.trim_start_matches("#").to_owned();
+        Ok(UrlContext::parse(UrlContext::new(
             RouterUrlContext,
-            // TODO FIXME
-            Url {
-                origin: location.origin()?,
-                path: location.hash()?.trim_start_matches("#").to_owned(),
-                search: location
-                    .search()?
-                    .strip_prefix('?')
-                    .map(String::from)
-                    .unwrap_or_default(),
-                search_params: search_params_from_web_url(
-                    &UrlSearchParams::new_with_str(&location.search()?)?,
-                )?,
-                hash: "".to_owned(), // TODO FIXME
-            },
-        ))
+            &(location.origin()? + &new),
+        )))
     }
 }
 
@@ -207,6 +200,7 @@ impl Routing for HashRouter {
 
                     is_back.set(is_navigating_back);
 
+                    // maybe this fails if two updates are happening in same tick?
                     url.set(new_url);
                 }
                 Err(e) => {
