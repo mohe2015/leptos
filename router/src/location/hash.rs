@@ -2,8 +2,8 @@ use super::{handle_anchor_click, LocationChange, Url};
 use crate::{
     hooks::use_navigate,
     location::{
-        BrowserUrlContext, RouterUrlContext, Routing, RoutingProvider,
-        UrlContext, UrlContexty as _,
+        custom_signal::CustomSignal, BrowserUrlContext, RouterUrlContext,
+        Routing, RoutingProvider, UrlContext, UrlContexty as _,
     },
 };
 use core::fmt;
@@ -83,8 +83,9 @@ impl RoutingProvider for HashRouter {
 impl Routing for HashRouter {
     type Error = JsValue;
 
-    fn as_url(&self) -> ArcMappedSignal<UrlContext<RouterUrlContext, Url>> {
+    fn as_url(&self) -> CustomSignal<UrlContext<RouterUrlContext, Url>> {
         let url = self.url.clone();
+        // here we need a custom signal for writing
         Signal::derive(move || {
             let mut url = url.get();
             url.map_mut(|url| {
