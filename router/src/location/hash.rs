@@ -83,7 +83,7 @@ impl RoutingProvider for HashRouter {
 impl Routing for HashRouter {
     type Error = JsValue;
 
-    fn as_url(&self) -> Signal<UrlContext<RouterUrlContext, Url>> {
+    fn as_url(&self) -> ArcMappedSignal<UrlContext<RouterUrlContext, Url>> {
         let url = self.url.clone();
         Signal::derive(move || {
             let mut url = url.get();

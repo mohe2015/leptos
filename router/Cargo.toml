@@ -28,6 +28,7 @@ thiserror = { workspace = true , default-features = true }
 percent-encoding = { version = "2.3", optional = true }
 gloo-net = { workspace = true, default-features = true }
 dyn-clone = "1"
+guardian = "1.3.0"
 
 [dependencies.web-sys]
 features = [

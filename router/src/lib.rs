@@ -119,7 +119,6 @@
 //! [`Leptos`]: <https://github.com/leptos-rs/leptos>
 //! [`router`]: <https://github.com/leptos-rs/leptos/blob/main/examples/router/src/lib.rs>
 
-#![forbid(unsafe_code)]
 #![deny(missing_docs)]
 #![cfg_attr(all(feature = "nightly", rustc_nightly), feature(auto_traits))]
 #![cfg_attr(all(feature = "nightly", rustc_nightly), feature(negative_impls))]

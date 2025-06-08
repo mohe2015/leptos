@@ -4,7 +4,10 @@ use any_spawner::Executor;
 use core::fmt::Debug;
 use dyn_clone::DynClone;
 use js_sys::{try_iter, Array, JsString, Reflect};
-use leptos::{prelude::Signal, server::ServerActionError};
+use leptos::{
+    prelude::{ArcMappedSignal, Signal},
+    server::ServerActionError,
+};
 use reactive_graph::{
     computed::Memo, owner::provide_context, signal::ReadSignal, traits::With,
 };
@@ -71,6 +74,22 @@ impl<C: UrlContextType, T> UrlContext<C, T> {
         _context2: C2,
     ) -> UrlContext<C2, T> {
         UrlContext(self.0, PhantomData)
+    }
+
+    pub fn change_context_ref<C2: UrlContextType>(
+        self: &UrlContext<C, T>,
+        _context: C,
+        _context2: C2,
+    ) -> &UrlContext<C2, T> {
+        unsafe { std::mem::transmute(self) }
+    }
+
+    pub fn change_context_mut<C2: UrlContextType>(
+        self: &mut UrlContext<C, T>,
+        _context: C,
+        _context2: C2,
+    ) -> &mut UrlContext<C2, T> {
+        unsafe { std::mem::transmute(self) }
     }
 }
 
@@ -552,7 +571,7 @@ pub trait RoutingProvider: Routing + Clone {
 pub trait Routing: DynClone + Send + Sync + 'static {
     type Error: Debug;
 
-    fn as_url(&self) -> Signal<UrlContext<RouterUrlContext, Url>>;
+    fn as_url(&self) -> ArcMappedSignal<UrlContext<RouterUrlContext, Url>>;
 
     /// Sets up any global event listeners or other initialization needed.
     fn init(
@@ -588,7 +607,7 @@ dyn_clone::clone_trait_object!(Routing<Error = JsValue>);
 impl Routing for Box<dyn Routing<Error = JsValue> + '_> {
     type Error = JsValue;
 
-    fn as_url(&self) -> Signal<UrlContext<RouterUrlContext, Url>> {
+    fn as_url(&self) -> ArcMappedSignal<UrlContext<RouterUrlContext, Url>> {
         (**self).as_url()
     }
 
