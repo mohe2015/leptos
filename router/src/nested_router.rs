@@ -11,7 +11,9 @@ use crate::{
 use any_spawner::Executor;
 use either_of::{Either, EitherOf3};
 use futures::{channel::oneshot, future::join_all, FutureExt};
-use leptos::{attr::any_attribute::AnyAttribute, component, oco::Oco};
+use leptos::{
+    attr::any_attribute::AnyAttribute, component, oco::Oco, prelude::Signal,
+};
 use or_poisoned::OrPoisoned;
 use reactive_graph::{
     computed::{ArcMemo, ScopedFuture},
@@ -47,7 +49,7 @@ pub(crate) struct NestedRoutesView<Loc, Defs, FalFn> {
     pub location: Option<Loc>,
     pub routes: RouteDefs<Defs>,
     pub outer_owner: Owner,
-    pub current_url: ArcRwSignal<UrlContext<RouterUrlContext, Url>>,
+    pub current_url: Signal<UrlContext<RouterUrlContext, Url>>,
     pub base: Option<Oco<'static, str>>,
     pub fallback: FalFn,
     pub set_is_routing: Option<SignalSetter<bool>>,
@@ -60,7 +62,7 @@ where
     Fal: Render,
 {
     path: UrlContext<RouterUrlContext, String>,
-    current_url: ArcRwSignal<UrlContext<RouterUrlContext, Url>>,
+    current_url: Signal<UrlContext<RouterUrlContext, Url>>,
     outlets: Vec<RouteContext>,
     // TODO loading fallback
     #[allow(clippy::type_complexity)]

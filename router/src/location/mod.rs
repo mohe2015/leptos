@@ -493,7 +493,7 @@ pub struct Location {
 
 impl Location {
     pub(crate) fn new(
-        url: impl Into<ReadSignal<UrlContext<RouterUrlContext, Url>>>,
+        url: impl Into<Signal<UrlContext<RouterUrlContext, Url>>>,
         state: impl Into<ReadSignal<State>>,
     ) -> Self {
         let url = url.into();

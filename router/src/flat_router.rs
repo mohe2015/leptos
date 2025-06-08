@@ -10,7 +10,10 @@ use crate::{
 use any_spawner::Executor;
 use either_of::Either;
 use futures::FutureExt;
-use leptos::attr::{any_attribute::AnyAttribute, Attribute};
+use leptos::{
+    attr::{any_attribute::AnyAttribute, Attribute},
+    prelude::Signal,
+};
 use reactive_graph::{
     computed::{ArcMemo, ScopedFuture},
     owner::{provide_context, Owner},
@@ -32,7 +35,7 @@ use tachys::{
 };
 
 pub(crate) struct FlatRoutesView<Loc, Defs, FalFn> {
-    pub current_url: ArcRwSignal<UrlContext<RouterUrlContext, Url>>,
+    pub current_url: Signal<UrlContext<RouterUrlContext, Url>>,
     pub location: Option<Loc>,
     pub routes: RouteDefs<Defs>,
     pub fallback: FalFn,

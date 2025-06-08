@@ -218,16 +218,14 @@ where
 }
 
 #[track_caller]
-fn use_url_raw() -> ArcMappedSignal<Url> {
+fn use_url_raw() -> Signal<Url> {
     use_context().unwrap_or_else(|| {
         let RouterContext { current_url, .. } = use_context().expect(
             "Tried to access reactive URL outside a <Router> component.",
         );
-        ArcMappedSignal::new(
-            current_url,
-            |a| a.as_ref().forget_context(RouterUrlContext),
-            |a| a.as_mut().forget_context(RouterUrlContext),
-        )
+        Signal::derive(move || {
+            current_url.get().forget_context(RouterUrlContext)
+        })
     })
 }
 
