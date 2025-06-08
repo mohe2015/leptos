@@ -8,9 +8,7 @@ use crate::{
     params::{Params, ParamsError, ParamsMap},
 };
 use leptos::{
-    leptos_dom::helpers::request_animation_frame,
-    oco::Oco,
-    prelude::{ArcMappedSignal, Signal},
+    leptos_dom::helpers::request_animation_frame, oco::Oco, prelude::Signal,
 };
 use reactive_graph::{
     computed::{ArcMemo, Memo},

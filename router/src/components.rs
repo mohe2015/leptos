@@ -87,7 +87,11 @@ where
         let current_url =
             ArcRwSignal::new(UrlContext::new(RouterUrlContext, parsed));
 
-        (None, current_url.into(), Box::new(move |_: &str| {}))
+        (
+            None,
+            ArcMappedSignal::new(current_url, |x| x, |x| x),
+            Box::new(move |_: &str| {}),
+        )
     };
 
     #[cfg(not(feature = "ssr"))]
@@ -112,7 +116,7 @@ where
     };
     // provide router context
     let state = ArcRwSignal::new(State::new(None));
-    let location = Location::new(current_url, state.read_only());
+    let location = Location::new(current_url.clone(), state.read_only());
 
     // set server function redirect hook
     _ = server_fn::redirect::set_redirect_hook(redirect_hook);
@@ -134,7 +138,7 @@ where
 #[derive(Clone)]
 pub(crate) struct RouterContext {
     pub base: UrlContext<RouterUrlContext, Option<Cow<'static, str>>>,
-    pub current_url: Signal<UrlContext<RouterUrlContext, Url>>,
+    pub current_url: ArcMappedSignal<UrlContext<RouterUrlContext, Url>>,
     pub location: Location,
     pub state: ArcRwSignal<State>,
     pub set_is_routing: Option<SignalSetter<bool>>,
@@ -238,7 +242,7 @@ impl RouterContext {
 
         // update URL signal, if necessary
         let value = url.to_full_path();
-        if current != url {
+        if *current != url {
             drop(current);
             self.current_url.set(url); // this is a problem
         }
