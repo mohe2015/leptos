@@ -89,7 +89,7 @@ where
     fn inner(
         has_router: bool,
         method: Option<&'static str>,
-        action: ArcMemo<String>,
+        action: ArcMemo<UrlContext<BrowserUrlContext, String>>,
         enctype: Option<String>,
         version: Option<RwSignal<usize>>,
         error: Option<RwSignal<Option<Box<dyn Error + Send + Sync>>>>,
@@ -329,7 +329,9 @@ where
 
         form()
             .attr("method", method)
-            .attr("action", move || action.get())
+            .attr("action", move || {
+                action.get().forget_context(BrowserUrlContext)
+            })
             .attr("enctype", enctype)
             .on(ev::submit, on_submit)
             .child(children())
@@ -339,7 +341,9 @@ where
     let action = if has_router {
         use_resolved_path(move || action.to_href()())
     } else {
-        ArcMemo::new(move |_| action.to_href()())
+        ArcMemo::new(move |_| {
+            UrlContext::new(BrowserUrlContext, action.to_href()())
+        })
     };
     inner(
         has_router,

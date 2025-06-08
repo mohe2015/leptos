@@ -1,7 +1,9 @@
 use crate::{
     components::RouterContext,
     hooks::use_resolved_path,
-    location::{RouterUrlContext, UrlContext, UrlContexty as _},
+    location::{
+        BrowserUrlContext, RouterUrlContext, UrlContext, UrlContexty as _,
+    },
 };
 use leptos::{children::Children, oco::Oco, prelude::*};
 use reactive_graph::{computed::ArcMemo, owner::use_context};
@@ -106,24 +108,34 @@ where
     H: ToHref + Send + Sync + 'static,
 {
     fn inner(
-        href: ArcMemo<String>,
+        href: ArcMemo<UrlContext<BrowserUrlContext, String>>,
         target: Option<Oco<'static, str>>,
         exact: bool,
         children: Children,
         strict_trailing_slash: bool,
         scroll: bool,
     ) -> impl IntoView {
-        let RouterContext { current_url, .. } =
-            use_context().expect("tried to use <A/> outside a <Router/>.");
+        let RouterContext {
+            current_url,
+            location_provider,
+            ..
+        } = use_context().expect("tried to use <A/> outside a <Router/>.");
         let is_active = {
             let href = href.clone();
             move || {
                 let to = href.read();
-                let path = to.split(['?', '#']).next().unwrap_or_default();
+                let to = location_provider
+                    .as_ref()
+                    .unwrap()
+                    .browser_to_router_url(UrlContext::parse_with_default_base(
+                        to.as_ref().map(|to| to.as_str()),
+                    ))
+                    .unwrap();
+                let path = to.path();
                 current_url.with(|loc| {
                     let loc = loc.path();
                     if exact {
-                        loc.test(|loc| loc == path)
+                        loc == path
                     } else {
                         is_active_for(path, loc, strict_trailing_slash)
                     }
@@ -133,7 +145,7 @@ where
 
         view! {
             <a
-                href=move || href.get()
+                href=move || href.get().forget_context(BrowserUrlContext)
                 target=target
                 aria-current=move || if is_active() { Some("page") } else { None }
                 data-noscroll=!scroll
@@ -148,32 +160,34 @@ where
     inner(href, target, exact, children, strict_trailing_slash, scroll)
 }
 
+// TODO FIXME this is not working
 // Test if `href` is active for `location`.  Assumes _both_ `href` and `location` begin with a `'/'`.
 fn is_active_for(
-    href: &str,
+    href: UrlContext<RouterUrlContext, &str>,
     location: UrlContext<RouterUrlContext, &str>,
     strict_trailing_slash: bool,
 ) -> bool {
-    let mut href_f = href.split('/');
-    // location _must_ be consumed first to avoid draining href_f early
-    // also using enumerate to special case _the first two_ so that the allowance for ignoring the comparison
-    // with the loc fragment on an emtpy href fragment for non root related parts.
-    std::iter::zip(
-        location.forget_context(RouterUrlContext).split('/'),
-        href_f.by_ref(),
-    )
-    .enumerate()
-    .all(|(c, (loc_p, href_p))| loc_p == href_p || href_p.is_empty() && c > 1)
-        && match href_f.next() {
-            // when no href fragments remain, location is definitely somewhere nested inside href
-            None => true,
-            // when an outstanding href fragment is an empty string, default `strict_trailing_slash` setting will
-            // have the typical expected case where href="/item/" is active for location="/item", but when toggled
-            // to true it becomes inactive; please refer to test case comments for explanation.
-            Some("") => !strict_trailing_slash,
-            // inactive when href fragments remain (otherwise false postive for href="/item/one", location="/item")
-            _ => false,
-        }
+    (href, location).test(|(href, location)| {
+        let mut href_f = href.split('/');
+        // location _must_ be consumed first to avoid draining href_f early
+        // also using enumerate to special case _the first two_ so that the allowance for ignoring the comparison
+        // with the loc fragment on an emtpy href fragment for non root related parts.
+        std::iter::zip(location.split('/'), href_f.by_ref())
+            .enumerate()
+            .all(|(c, (loc_p, href_p))| {
+                loc_p == href_p || href_p.is_empty() && c > 1
+            })
+            && match href_f.next() {
+                // when no href fragments remain, location is definitely somewhere nested inside href
+                None => true,
+                // when an outstanding href fragment is an empty string, default `strict_trailing_slash` setting will
+                // have the typical expected case where href="/item/" is active for location="/item", but when toggled
+                // to true it becomes inactive; please refer to test case comments for explanation.
+                Some("") => !strict_trailing_slash,
+                // inactive when href fragments remain (otherwise false postive for href="/item/one", location="/item")
+                _ => false,
+            }
+    })
 }
 
 #[cfg(test)]
@@ -187,99 +201,99 @@ mod tests {
         [false, true].into_iter().for_each(|f| {
             // root
             assert!(is_active_for(
-                "/",
+                UrlContext::new(RouterUrlContext, "/"),
                 UrlContext::new(RouterUrlContext, "/"),
                 f
             ));
 
             // both at one level for all combinations of trailing slashes
             assert!(is_active_for(
-                "/item",
+                UrlContext::new(RouterUrlContext, "/item"),
                 UrlContext::new(RouterUrlContext, "/item"),
                 f
             ));
             // assert!(is_active_for("/item/", "/item", f));
             assert!(is_active_for(
-                "/item",
+                UrlContext::new(RouterUrlContext, "/item"),
                 UrlContext::new(RouterUrlContext, "/item/"),
                 f
             ));
             assert!(is_active_for(
-                "/item/",
+                UrlContext::new(RouterUrlContext, "/item/"),
                 UrlContext::new(RouterUrlContext, "/item/"),
                 f
             ));
 
             // plus sub one level for all combinations of trailing slashes
             assert!(is_active_for(
-                "/item",
+                UrlContext::new(RouterUrlContext, "/item"),
                 UrlContext::new(RouterUrlContext, "/item/one"),
                 f
             ));
             assert!(is_active_for(
-                "/item",
+                UrlContext::new(RouterUrlContext, "/item"),
                 UrlContext::new(RouterUrlContext, "/item/one/"),
                 f
             ));
             assert!(is_active_for(
-                "/item/",
+                UrlContext::new(RouterUrlContext, "/item/"),
                 UrlContext::new(RouterUrlContext, "/item/one"),
                 f
             ));
             assert!(is_active_for(
-                "/item/",
+                UrlContext::new(RouterUrlContext, "/item/"),
                 UrlContext::new(RouterUrlContext, "/item/one/"),
                 f
             ));
 
             // both at two levels for all combinations of trailing slashes
             assert!(is_active_for(
-                "/item/1",
+                UrlContext::new(RouterUrlContext, "/item/1"),
                 UrlContext::new(RouterUrlContext, "/item/1"),
                 f
             ));
             // assert!(is_active_for("/item/1/", "/item/1", f));
             assert!(is_active_for(
-                "/item/1",
+                UrlContext::new(RouterUrlContext, "/item/1"),
                 UrlContext::new(RouterUrlContext, "/item/1/"),
                 f
             ));
             assert!(is_active_for(
-                "/item/1/",
+                UrlContext::new(RouterUrlContext, "/item/1/"),
                 UrlContext::new(RouterUrlContext, "/item/1/"),
                 f
             ));
 
             // plus sub various levels for all combinations of trailing slashes
             assert!(is_active_for(
-                "/item/1",
+                UrlContext::new(RouterUrlContext, "/item/1"),
                 UrlContext::new(RouterUrlContext, "/item/1/two"),
                 f
             ));
             assert!(is_active_for(
-                "/item/1",
+                UrlContext::new(RouterUrlContext, "/item/1"),
                 UrlContext::new(RouterUrlContext, "/item/1/three/four/"),
                 f
             ));
             assert!(is_active_for(
-                "/item/1/",
+                UrlContext::new(RouterUrlContext, "/item/1/"),
                 UrlContext::new(RouterUrlContext, "/item/1/three/four"),
                 f
             ));
             assert!(is_active_for(
-                "/item/1/",
+                UrlContext::new(RouterUrlContext, "/item/1/"),
                 UrlContext::new(RouterUrlContext, "/item/1/two/"),
                 f
             ));
 
             // both at various levels for various trailing slashes
             assert!(is_active_for(
-                "/item/1/two/three",
+                UrlContext::new(RouterUrlContext, "/item/1/two/three"),
                 UrlContext::new(RouterUrlContext, "/item/1/two/three"),
                 f
             ));
             assert!(is_active_for(
-                "/item/1/two/three/444",
+                UrlContext::new(RouterUrlContext, "/item/1/two/three/444"),
                 UrlContext::new(RouterUrlContext, "/item/1/two/three/444/"),
                 f
             ));
@@ -289,7 +303,10 @@ mod tests {
             //     f
             // ));
             assert!(is_active_for(
-                "/item/1/two/three/444/FIVE/final/",
+                UrlContext::new(
+                    RouterUrlContext,
+                    "/item/1/two/three/444/FIVE/final/"
+                ),
                 UrlContext::new(
                     RouterUrlContext,
                     "/item/1/two/three/444/FIVE/final/"
@@ -299,7 +316,7 @@ mod tests {
 
             // sub various levels for various trailing slashes
             assert!(is_active_for(
-                "/item/1/two/three",
+                UrlContext::new(RouterUrlContext, "/item/1/two/three"),
                 UrlContext::new(
                     RouterUrlContext,
                     "/item/1/two/three/three/two/1/item"
@@ -307,7 +324,7 @@ mod tests {
                 f
             ));
             assert!(is_active_for(
-                "/item/1/two/three/444",
+                UrlContext::new(RouterUrlContext, "/item/1/two/three/444"),
                 UrlContext::new(
                     RouterUrlContext,
                     "/item/1/two/three/444/just_one_more/"
@@ -315,7 +332,10 @@ mod tests {
                 f
             ));
             assert!(is_active_for(
-                "/item/1/two/three/444/final/",
+                UrlContext::new(
+                    RouterUrlContext,
+                    "/item/1/two/three/444/final/"
+                ),
                 UrlContext::new(
                     RouterUrlContext,
                     "/item/1/two/three/444/final/just/kidding"
@@ -327,12 +347,12 @@ mod tests {
 
             // since empty fragments are not checked, these all highlight
             assert!(is_active_for(
-                "/item/////",
+                UrlContext::new(RouterUrlContext, "/item/////"),
                 UrlContext::new(RouterUrlContext, "/item/one/two/three/four/"),
                 f
             ));
             assert!(is_active_for(
-                "/item/////",
+                UrlContext::new(RouterUrlContext, "/item/////"),
                 UrlContext::new(
                     RouterUrlContext,
                     "/item/1/two/three/three/two/1/item"
@@ -340,7 +360,7 @@ mod tests {
                 f
             ));
             assert!(is_active_for(
-                "/item/1///three//1",
+                UrlContext::new(RouterUrlContext, "/item/1///three//1"),
                 UrlContext::new(
                     RouterUrlContext,
                     "/item/1/two/three/three/two/1/item"
@@ -351,7 +371,7 @@ mod tests {
             // artifact of the checking algorithm, as it assumes empty segments denote termination of sort, so
             // omission acts like a wildcard that isn't checked.
             assert!(is_active_for(
-                "/item//foo",
+                UrlContext::new(RouterUrlContext, "/item//foo"),
                 UrlContext::new(
                     RouterUrlContext,
                     "/item/this_is_not_empty/foo/bar/baz"
@@ -363,17 +383,17 @@ mod tests {
         // Refer to comment on the similar scenario on the next test case for explanation, as this assumes the
         // "typical" case where the strict trailing slash flag is unset or false.
         assert!(is_active_for(
-            "/item/",
+            UrlContext::new(RouterUrlContext, "/item/"),
             UrlContext::new(RouterUrlContext, "/item"),
             false
         ));
         assert!(is_active_for(
-            "/item/1/",
+            UrlContext::new(RouterUrlContext, "/item/1/"),
             UrlContext::new(RouterUrlContext, "/item/1"),
             false
         ));
         assert!(is_active_for(
-            "/item/1/two/three/444/FIVE/",
+            UrlContext::new(RouterUrlContext, "/item/1/two/three/444/FIVE/"),
             UrlContext::new(RouterUrlContext, "/item/1/two/three/444/FIVE"),
             false
         ));
@@ -384,127 +404,136 @@ mod tests {
         [false, true].into_iter().for_each(|f| {
             // href="/"
             assert!(!is_active_for(
-                "/",
+                UrlContext::new(RouterUrlContext, "/"),
                 UrlContext::new(RouterUrlContext, "/item"),
                 f
             ));
             assert!(!is_active_for(
-                "/",
+                UrlContext::new(RouterUrlContext, "/"),
                 UrlContext::new(RouterUrlContext, "/somewhere/"),
                 f
             ));
             assert!(!is_active_for(
-                "/",
+                UrlContext::new(RouterUrlContext, "/"),
                 UrlContext::new(RouterUrlContext, "/else/where"),
                 f
             ));
             assert!(!is_active_for(
-                "/",
+                UrlContext::new(RouterUrlContext, "/"),
                 UrlContext::new(RouterUrlContext, "/no/where/"),
                 f
             ));
 
             // non root href but location at root
             assert!(!is_active_for(
-                "/somewhere",
+                UrlContext::new(RouterUrlContext, "/somewhere"),
                 UrlContext::new(RouterUrlContext, "/"),
                 f
             ));
             assert!(!is_active_for(
-                "/somewhere/",
+                UrlContext::new(RouterUrlContext, "/somewhere/"),
                 UrlContext::new(RouterUrlContext, "/"),
                 f
             ));
             assert!(!is_active_for(
-                "/else/where",
+                UrlContext::new(RouterUrlContext, "/else/where"),
                 UrlContext::new(RouterUrlContext, "/"),
                 f
             ));
             assert!(!is_active_for(
-                "/no/where/",
+                UrlContext::new(RouterUrlContext, "/no/where/"),
                 UrlContext::new(RouterUrlContext, "/"),
                 f
             ));
 
             // mismatch either side all combinations of trailing slashes
             assert!(!is_active_for(
-                "/level",
+                UrlContext::new(RouterUrlContext, "/level"),
                 UrlContext::new(RouterUrlContext, "/item"),
                 f
             ));
             assert!(!is_active_for(
-                "/level",
+                UrlContext::new(RouterUrlContext, "/level"),
                 UrlContext::new(RouterUrlContext, "/item/"),
                 f
             ));
             assert!(!is_active_for(
-                "/level/",
+                UrlContext::new(RouterUrlContext, "/level/"),
                 UrlContext::new(RouterUrlContext, "/item"),
                 f
             ));
             assert!(!is_active_for(
-                "/level/",
+                UrlContext::new(RouterUrlContext, "/level/"),
                 UrlContext::new(RouterUrlContext, "/item/"),
                 f
             ));
 
             // one level parent for all combinations of trailing slashes
             assert!(!is_active_for(
-                "/item/one",
+                UrlContext::new(RouterUrlContext, "/item/one"),
                 UrlContext::new(RouterUrlContext, "/item"),
                 f
             ));
             assert!(!is_active_for(
-                "/item/one/",
+                UrlContext::new(RouterUrlContext, "/item/one/"),
                 UrlContext::new(RouterUrlContext, "/item"),
                 f
             ));
             assert!(!is_active_for(
-                "/item/one",
+                UrlContext::new(RouterUrlContext, "/item/one"),
                 UrlContext::new(RouterUrlContext, "/item/"),
                 f
             ));
             assert!(!is_active_for(
-                "/item/one/",
+                UrlContext::new(RouterUrlContext, "/item/one/"),
                 UrlContext::new(RouterUrlContext, "/item/"),
                 f
             ));
 
             // various parent levels for all combinations of trailing slashes
             assert!(!is_active_for(
-                "/item/1/two",
+                UrlContext::new(RouterUrlContext, "/item/1/two"),
                 UrlContext::new(RouterUrlContext, "/item/1"),
                 f
             ));
             assert!(!is_active_for(
-                "/item/1/three/four/",
+                UrlContext::new(RouterUrlContext, "/item/1/three/four/"),
                 UrlContext::new(RouterUrlContext, "/item/1"),
                 f
             ));
             assert!(!is_active_for(
-                "/item/1/three/four",
+                UrlContext::new(RouterUrlContext, "/item/1/three/four"),
                 UrlContext::new(RouterUrlContext, "/item/"),
                 f
             ));
             assert!(!is_active_for(
-                "/item/1/two/",
+                UrlContext::new(RouterUrlContext, "/item/1/two/"),
                 UrlContext::new(RouterUrlContext, "/item/"),
                 f
             ));
 
             // sub various levels for various trailing slashes
             assert!(!is_active_for(
-                "/item/1/two/three/three/two/1/item",
+                UrlContext::new(
+                    RouterUrlContext,
+                    "/item/1/two/three/three/two/1/item"
+                ),
                 UrlContext::new(RouterUrlContext, "/item/1/two/three"),
                 f
             ));
             assert!(!is_active_for(
-                "/item/1/two/three/444/just_one_more/",
+                UrlContext::new(
+                    RouterUrlContext,
+                    "/item/1/two/three/444/just_one_more/"
+                ),
                 UrlContext::new(RouterUrlContext, "/item/1/two/three/444"),
                 f
             ));
             assert!(!is_active_for(
-                "/item/1/two/three/444/final/just/kidding",
+                UrlContext::new(
+                    RouterUrlContext,
+                    "/item/1/two/three/444/final/just/kidding"
+                ),
                 UrlContext::new(
                     RouterUrlContext,
                     "/item/1/two/three/444/final/"
@@ -517,7 +546,7 @@ mod tests {
             // default trailing slash has the expected behavior of non-matching of any non-root location
             // this checks as if `href="/"`
             assert!(!is_active_for(
-                "//////",
+                UrlContext::new(RouterUrlContext, "//////"),
                 UrlContext::new(
                     RouterUrlContext,
                     "/item/1/two/three/three/two/1/item"
@@ -526,18 +555,21 @@ mod tests {
             ));
             // some weird root location?
             assert!(!is_active_for(
-                "/item/1/two/three/three/two/1/item",
+                UrlContext::new(
+                    RouterUrlContext,
+                    "/item/1/two/three/three/two/1/item"
+                ),
                 UrlContext::new(RouterUrlContext, "//////"),
                 f
             ));
 
             assert!(!is_active_for(
-                "/item/one/two/three/four/",
+                UrlContext::new(RouterUrlContext, "/item/one/two/three/four/"),
                 UrlContext::new(RouterUrlContext, "/item/////"),
                 f
             ));
             assert!(!is_active_for(
-                "/item/one/two/three/four/",
+                UrlContext::new(RouterUrlContext, "/item/one/two/three/four/"),
                 UrlContext::new(RouterUrlContext, "/item////four/"),
                 f
             ));
@@ -555,17 +587,17 @@ mod tests {
         // expected by "ordinary" end-users who almost never encounter this particular scenario.
 
         assert!(!is_active_for(
-            "/item/",
+            UrlContext::new(RouterUrlContext, "/item/"),
             UrlContext::new(RouterUrlContext, "/item"),
             true
         ));
         assert!(!is_active_for(
-            "/item/1/",
+            UrlContext::new(RouterUrlContext, "/item/1/"),
             UrlContext::new(RouterUrlContext, "/item/1"),
             true
         ));
         assert!(!is_active_for(
-            "/item/1/two/three/444/FIVE/",
+            UrlContext::new(RouterUrlContext, "/item/1/two/three/444/FIVE/"),
             UrlContext::new(RouterUrlContext, "/item/1/two/three/444/FIVE"),
             true
         ));
