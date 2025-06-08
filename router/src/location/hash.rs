@@ -107,7 +107,7 @@ impl Routing for HashRouter {
         mut url: UrlContext<BrowserUrlContext, Url>,
     ) -> Result<UrlContext<RouterUrlContext, Url>, Self::Error> {
         url.map_mut(|url| {
-            url.path = url.hash.strip_prefix('#').unwrap().to_owned();
+            url.path = url.hash.strip_prefix('#').unwrap_or("/").to_owned();
             url.hash = String::new();
         });
         Ok(url.change_context(BrowserUrlContext, RouterUrlContext))
