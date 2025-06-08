@@ -2,8 +2,8 @@ use super::{handle_anchor_click, LocationChange, Url};
 use crate::{
     hooks::use_navigate,
     location::{
-        search_params_from_web_url, BrowserUrlContext, RouterUrlContext,
-        Routing, RoutingProvider, UrlContext, UrlContexty as _,
+        BrowserUrlContext, RouterUrlContext, Routing, RoutingProvider,
+        UrlContext, UrlContexty as _,
     },
 };
 use core::fmt;
@@ -22,7 +22,7 @@ use std::{
 };
 use tachys::dom::{document, window};
 use wasm_bindgen::{closure::Closure, JsCast, JsValue};
-use web_sys::{console, Event, UrlSearchParams};
+use web_sys::{console, Event};
 
 #[derive(Clone)]
 pub struct HashRouter {
@@ -66,7 +66,11 @@ impl RoutingProvider for HashRouter {
     fn new() -> Result<Self, JsValue> {
         let url = ArcRwSignal::new(Self::current()?);
         console::log_1(
-            &format!("{:?}", url.get().forget_context(RouterUrlContext)).into(),
+            &format!(
+                "{:?}",
+                url.get_untracked().forget_context(RouterUrlContext)
+            )
+            .into(),
         );
         let path_stack = ArcStoredValue::new(
             Self::current().map(|n| vec![n]).unwrap_or_default(),
@@ -201,6 +205,7 @@ impl Routing for HashRouter {
                     is_back.set(is_navigating_back);
 
                     // maybe this fails if two updates are happening in same tick?
+                    assert!(!url.is_disposed());
                     url.set(new_url);
                 }
                 Err(e) => {

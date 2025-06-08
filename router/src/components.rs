@@ -222,6 +222,8 @@ impl RouterContext {
         }
 
         if url.origin() != current.origin() {
+            drop(current);
+            // this will call popstate synchronously? and as current is still locked this doesn't work?
             window()
                 .location()
                 .set_href(path.forget_context(RouterUrlContext))
