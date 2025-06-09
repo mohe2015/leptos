@@ -82,13 +82,8 @@ impl RoutingProvider for BrowserRouter {
 impl Routing for BrowserRouter {
     type Error = JsValue;
 
-    fn as_url(&self) -> ArcMappedSignal<UrlContext<RouterUrlContext, Url>> {
-        let url = self.url.clone();
-        ArcMappedSignal::new(
-            url,
-            |x| x.change_context_ref(BrowserUrlContext, RouterUrlContext),
-            |x| x.change_context_mut(BrowserUrlContext, RouterUrlContext),
-        )
+    fn as_url(&self) -> ArcRwSignal<UrlContext<BrowserUrlContext, Url>> {
+        self.url.clone()
     }
 
     fn browser_to_router_url(

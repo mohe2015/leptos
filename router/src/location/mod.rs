@@ -5,7 +5,7 @@ use core::fmt::Debug;
 use dyn_clone::DynClone;
 use js_sys::{try_iter, Array, JsString, Reflect};
 use leptos::{
-    prelude::{ArcMappedSignal, Signal},
+    prelude::{ArcRwSignal, Signal},
     server::ServerActionError,
 };
 use reactive_graph::{
@@ -17,11 +17,10 @@ use tachys::dom::window;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{Event, HtmlAnchorElement, MouseEvent};
 
-mod custom_signal;
 mod hash;
 mod history;
 mod server;
-use crate::{location::custom_signal::CustomSignal, params::ParamsMap};
+use crate::params::ParamsMap;
 pub use hash::*;
 pub use history::*;
 pub use server::*;
@@ -572,7 +571,7 @@ pub trait RoutingProvider: Routing + Clone {
 pub trait Routing: DynClone + Send + Sync + 'static {
     type Error: Debug;
 
-    fn as_url(&self) -> CustomSignal<UrlContext<RouterUrlContext, Url>>;
+    fn as_url(&self) -> ArcRwSignal<UrlContext<BrowserUrlContext, Url>>;
 
     /// Sets up any global event listeners or other initialization needed.
     fn init(
@@ -608,7 +607,7 @@ dyn_clone::clone_trait_object!(Routing<Error = JsValue>);
 impl Routing for Box<dyn Routing<Error = JsValue> + '_> {
     type Error = JsValue;
 
-    fn as_url(&self) -> ArcMappedSignal<UrlContext<RouterUrlContext, Url>> {
+    fn as_url(&self) -> ArcRwSignal<UrlContext<BrowserUrlContext, Url>> {
         (**self).as_url()
     }
 
