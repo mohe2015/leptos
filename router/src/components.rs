@@ -74,49 +74,45 @@ pub fn Router<Chil>(
     children: TypedChildren<Chil>,
     /// The routing provider to use.
     #[prop(default = BrowserRouter::new().map(|v| Box::new(v) as Box<dyn Routing<Error = JsValue>>))]
-    location: Result<Box<dyn Routing<Error = JsValue>>, JsValue>,
+    routing: Result<Box<dyn Routing<Error = JsValue>>, JsValue>,
 ) -> impl IntoView
 where
     Chil: IntoView,
 {
     let base = UrlContext::new(RouterUrlContext, base); // don't expose type to end user
     #[cfg(feature = "ssr")]
-    let (location_provider, current_url, redirect_hook) = {
+    let (routing, location, current_url, redirect_hook) = {
         let req = use_context::<RequestUrl>().expect("no RequestUrl provided");
         let parsed = req.parse().expect("could not parse RequestUrl");
         let current_url =
-            ArcRwSignal::new(UrlContext::new(RouterUrlContext, parsed));
+            ArcRwSignal::new(UrlContext::new(BrowserUrlContext, parsed));
 
-        (
-            None,
-            ArcMappedSignal::new(current_url, |x| x, |x| x),
-            Box::new(move |_: &str| {}),
-        )
+        (None, current_url, current_url, Box::new(move |_: &str| {}))
     };
 
-    #[cfg(not(feature = "ssr"))]
-    let (location_provider, current_url, redirect_hook) = {
+    //#[cfg(not(feature = "ssr"))]
+    let (routing, location, current_url, redirect_hook) = {
         let owner = Owner::current();
-        let location = location.expect("could not access browser navigation");
-        location.init(base.clone());
-        provide_context(location.clone());
-        let current_url = location.as_url().clone();
+        let routing = routing.expect("could not access browser navigation");
+        routing.init(base.clone());
+        provide_context(routing.clone());
+        let current_url = routing.as_url().clone();
 
-        let location_clone = location.clone();
+        let routing = routing.clone();
         let redirect_hook = Box::new(move |loc: &str| {
             if let Some(owner) = &owner {
                 owner.with(|| {
-                    location_clone
-                        .redirect(&UrlContext::new(RouterUrlContext, loc))
+                    routing.redirect(&UrlContext::new(RouterUrlContext, loc))
                 });
             }
         });
 
-        (Some(location), current_url, redirect_hook)
+        let location = Signal::derive(move || current_url.get());
+        (Some(routing), location, current_url, redirect_hook)
     };
     // provide router context
     let state = ArcRwSignal::new(State::new(None));
-    let location = Location::new(current_url.clone(), state.read_only());
+    let location = Location::new(location, state.read_only());
 
     // set server function redirect hook
     _ = server_fn::redirect::set_redirect_hook(redirect_hook);
@@ -138,7 +134,7 @@ where
 #[derive(Clone)]
 pub(crate) struct RouterContext {
     pub base: UrlContext<RouterUrlContext, Option<Cow<'static, str>>>,
-    pub current_url: ArcMappedSignal<UrlContext<RouterUrlContext, Url>>,
+    pub current_url: ArcRwSignal<UrlContext<BrowserUrlContext, Url>>,
     pub location: Location,
     pub state: ArcRwSignal<State>,
     pub set_is_routing: Option<SignalSetter<bool>>,
@@ -175,31 +171,32 @@ impl RouterContext {
         let mut url = {
             let url = resolved_to.as_ref().map(|r| &**r);
             let base = &BASE;
-            let location = base.as_ref().map(|base| {
-                web_sys::Url::new_with_base(
-                    url.forget_context(RouterUrlContext),
-                    base,
-                )
-                .unwrap()
-            });
-            location
-                .map(|location| {
-                    Url {
-                        origin: location.origin(),
-                        path: location.pathname(),
-                        search: location
-                            .search()
-                            .strip_prefix('?')
-                            .map(String::from)
-                            .unwrap_or_default(),
-                        search_params: search_params_from_web_url(
-                            &location.search_params(),
-                        )
-                        .unwrap(), // TODO FIXME unwrap
-                        hash: location.hash(),
-                    }
+            let location = base
+                .as_ref()
+                .map(|base| {
+                    web_sys::Url::new_with_base(
+                        url.forget_context(RouterUrlContext),
+                        base,
+                    )
+                    .unwrap()
                 })
-                .change_context(BrowserUrlContext, RouterUrlContext)
+                .change_context(BrowserUrlContext, RouterUrlContext);
+            location.map(|location| {
+                Url {
+                    origin: location.origin(),
+                    path: location.pathname(),
+                    search: location
+                        .search()
+                        .strip_prefix('?')
+                        .map(String::from)
+                        .unwrap_or_default(),
+                    search_params: search_params_from_web_url(
+                        &location.search_params(),
+                    )
+                    .unwrap(), // TODO FIXME unwrap
+                    hash: location.hash(),
+                }
+            })
         };
 
         let query_mutations =
@@ -224,6 +221,12 @@ impl RouterContext {
                 *s = new_value;
             });
         }
+
+        let url = self
+            .location_provider
+            .unwrap()
+            .router_to_browser_url(url)
+            .unwrap();
 
         if url.origin() != current.origin() {
             drop(current);
