@@ -80,6 +80,8 @@ where
     Chil: IntoView,
 {
     let base = UrlContext::new(RouterUrlContext, base); // don't expose type to end user
+    let state = ArcRwSignal::new(State::new(None));
+
     #[cfg(feature = "ssr")]
     let (routing, location, current_url, redirect_hook) = {
         let req = use_context::<RequestUrl>().expect("no RequestUrl provided");
@@ -87,32 +89,50 @@ where
         let current_url =
             ArcRwSignal::new(UrlContext::new(BrowserUrlContext, parsed));
 
-        (None, current_url, current_url, Box::new(move |_: &str| {}))
+        let current_url_clone = current_url.clone();
+        (
+            None,
+            Location::new(
+                Signal::derive(move || {
+                    current_url_clone
+                        .get()
+                        .change_context(BrowserUrlContext, RouterUrlContext)
+                }),
+                state.read_only(),
+            ),
+            current_url,
+            Box::new(move |_: &str| {}),
+        )
     };
 
     //#[cfg(not(feature = "ssr"))]
     let (routing, location, current_url, redirect_hook) = {
         let owner = Owner::current();
-        let routing = routing.expect("could not access browser navigation");
+        let routing: Box<dyn Routing<Error = JsValue> + 'static> =
+            routing.expect("could not access browser navigation");
         routing.init(base.clone());
         provide_context(routing.clone());
         let current_url = routing.as_url().clone();
 
-        let routing = routing.clone();
+        let routing_clone = routing.clone();
         let redirect_hook = Box::new(move |loc: &str| {
             if let Some(owner) = &owner {
                 owner.with(|| {
-                    routing.redirect(&UrlContext::new(RouterUrlContext, loc))
+                    routing_clone
+                        .redirect(&UrlContext::new(RouterUrlContext, loc))
                 });
             }
         });
-
-        let location = Signal::derive(move || current_url.get());
+        let routing_clone = routing.clone();
+        let current_url_clone = current_url.clone();
+        let location = Signal::derive(move || {
+            routing_clone
+                .browser_to_router_url(current_url_clone.get())
+                .unwrap()
+        });
+        let location = Location::new(location, state.read_only());
         (Some(routing), location, current_url, redirect_hook)
     };
-    // provide router context
-    let state = ArcRwSignal::new(State::new(None));
-    let location = Location::new(location, state.read_only());
 
     // set server function redirect hook
     _ = server_fn::redirect::set_redirect_hook(redirect_hook);
@@ -124,7 +144,7 @@ where
         state,
         set_is_routing,
         query_mutations: Default::default(),
-        location_provider,
+        location_provider: routing,
     });
 
     let children = children.into_inner();
