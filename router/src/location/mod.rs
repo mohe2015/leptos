@@ -214,32 +214,32 @@ impl Default for LocationChange {
 pub trait LocationProvider: Clone + 'static {
     type Error: Debug;
 
-    fn new() -> Result<Self, Self::Error>;
+    fn new2() -> Result<Self, Self::Error>;
 
-    fn as_url(&self) -> &ArcRwSignal<Url>;
+    fn as_url2(&self) -> &ArcRwSignal<Url>;
 
-    fn current() -> Result<Url, Self::Error>;
+    fn current2() -> Result<Url, Self::Error>;
 
     /// Sets up any global event listeners or other initialization needed.
-    fn init(&self, base: Option<Cow<'static, str>>);
+    fn init2(&self, base: Option<Cow<'static, str>>);
 
     /// Should be called after a navigation when all route components and data have been loaded and
     /// the URL can be updated.
-    fn ready_to_complete(&self);
+    fn ready_to_complete2(&self);
 
     /// Update the browser's history to reflect a new location.
-    fn complete_navigation(&self, loc: &LocationChange);
+    fn complete_navigation2(&self, loc: &LocationChange);
 
-    fn parse(url: &str) -> Result<Url, Self::Error> {
-        Self::parse_with_base(url, BASE)
+    fn parse2(url: &str) -> Result<Url, Self::Error> {
+        Self::parse_with_base2(url, BASE)
     }
 
-    fn parse_with_base(url: &str, base: &str) -> Result<Url, Self::Error>;
+    fn parse_with_base2(url: &str, base: &str) -> Result<Url, Self::Error>;
 
-    fn redirect(loc: &str);
+    fn redirect2(loc: &str);
 
     /// Whether we are currently in a "back" navigation.
-    fn is_back(&self) -> ReadSignal<bool>;
+    fn is_back2(&self) -> ReadSignal<bool>;
 }
 
 #[derive(Debug, Clone, Default)]

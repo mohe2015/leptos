@@ -59,10 +59,10 @@ impl BrowserUrl {
 impl LocationProvider for BrowserUrl {
     type Error = JsValue;
 
-    fn new() -> Result<Self, JsValue> {
-        let url = ArcRwSignal::new(Self::current()?);
+    fn new2() -> Result<Self, JsValue> {
+        let url = ArcRwSignal::new(Self::current2()?);
         let path_stack = ArcStoredValue::new(
-            Self::current().map(|n| vec![n]).unwrap_or_default(),
+            Self::current2().map(|n| vec![n]).unwrap_or_default(),
         );
         Ok(Self {
             url,
@@ -72,11 +72,11 @@ impl LocationProvider for BrowserUrl {
         })
     }
 
-    fn as_url(&self) -> &ArcRwSignal<Url> {
+    fn as_url2(&self) -> &ArcRwSignal<Url> {
         &self.url
     }
 
-    fn current() -> Result<Url, Self::Error> {
+    fn current2() -> Result<Url, Self::Error> {
         let location = window().location();
         Ok(Url {
             origin: location.origin()?,
@@ -93,12 +93,12 @@ impl LocationProvider for BrowserUrl {
         })
     }
 
-    fn parse(url: &str) -> Result<Url, Self::Error> {
+    fn parse2(url: &str) -> Result<Url, Self::Error> {
         let base = window().location().origin()?;
-        Self::parse_with_base(url, &base)
+        Self::parse_with_base2(url, &base)
     }
 
-    fn parse_with_base(url: &str, base: &str) -> Result<Url, Self::Error> {
+    fn parse_with_base2(url: &str, base: &str) -> Result<Url, Self::Error> {
         let location = web_sys::Url::new_with_base(url, base)?;
         Ok(Url {
             origin: location.origin(),
@@ -115,7 +115,7 @@ impl LocationProvider for BrowserUrl {
         })
     }
 
-    fn init(&self, base: Option<Cow<'static, str>>) {
+    fn init2(&self, base: Option<Cow<'static, str>>) {
         let window = window();
         let navigate = {
             let url = self.url.clone();
@@ -130,7 +130,7 @@ impl LocationProvider for BrowserUrl {
 
                 url.set(new_url.clone());
                 if same_path {
-                    this.complete_navigation(&loc);
+                    this.complete_navigation2(&loc);
                 }
                 let pending = Arc::clone(&pending);
                 let (tx, rx) = oneshot::channel::<()>();
@@ -149,7 +149,7 @@ impl LocationProvider for BrowserUrl {
                             // browser URL
                             let curr = url.read_untracked();
                             if curr == new_url {
-                                this.complete_navigation(&loc);
+                                this.complete_navigation2(&loc);
                             }
                         }
                     }
@@ -158,7 +158,7 @@ impl LocationProvider for BrowserUrl {
         };
 
         let handle_anchor_click =
-            handle_anchor_click(base, Self::parse_with_base, navigate);
+            handle_anchor_click(base, Self::parse_with_base2, navigate);
         let closure = Closure::wrap(Box::new(move |ev: Event| {
             if let Err(e) = handle_anchor_click(ev) {
                 #[cfg(feature = "tracing")]
@@ -183,7 +183,7 @@ impl LocationProvider for BrowserUrl {
             let url = self.url.clone();
             let path_stack = self.path_stack.clone();
             let is_back = self.is_back.clone();
-            move || match Self::current() {
+            move || match Self::current2() {
                 Ok(new_url) => {
                     let stack = path_stack.read_value();
                     let is_navigating_back = stack.len() == 1
@@ -212,13 +212,13 @@ impl LocationProvider for BrowserUrl {
             .expect("couldn't add `popstate` listener to `window`");
     }
 
-    fn ready_to_complete(&self) {
+    fn ready_to_complete2(&self) {
         if let Some(tx) = self.pending_navigation.lock().or_poisoned().take() {
             _ = tx.send(());
         }
     }
 
-    fn complete_navigation(&self, loc: &LocationChange) {
+    fn complete_navigation2(&self, loc: &LocationChange) {
         let history = window().history().unwrap();
 
         if loc.replace {
@@ -239,7 +239,7 @@ impl LocationProvider for BrowserUrl {
 
         // add this URL to the "path stack" for detecting back navigations, and
         // unset "navigating back" state
-        if let Ok(url) = Self::current() {
+        if let Ok(url) = Self::current2() {
             self.path_stack.write_value().push(url);
             self.is_back.set(false);
         }
@@ -248,7 +248,7 @@ impl LocationProvider for BrowserUrl {
         Self::scroll_to_el(loc.scroll);
     }
 
-    fn redirect(loc: &str) {
+    fn redirect2(loc: &str) {
         let navigate = use_navigate();
         let Some(url) = resolve_redirect_url(loc) else {
             return; // resolve_redirect_url() already logs an error
@@ -266,7 +266,7 @@ impl LocationProvider for BrowserUrl {
         }
     }
 
-    fn is_back(&self) -> ReadSignal<bool> {
+    fn is_back2(&self) -> ReadSignal<bool> {
         self.is_back.read_only().into()
     }
 }
