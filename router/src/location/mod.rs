@@ -16,9 +16,11 @@ use tachys::dom::window;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{Event, HtmlAnchorElement, MouseEvent};
 
+mod hash_router;
 mod history;
 mod server;
 use crate::params::ParamsMap;
+pub use hash_router::*;
 pub use history::*;
 pub use server::*;
 
