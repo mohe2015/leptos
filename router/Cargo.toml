@@ -26,6 +26,7 @@ send_wrapper = { workspace = true, default-features = true }
 thiserror = { workspace = true , default-features = true }
 percent-encoding = { optional = true , workspace = true, default-features = true }
 gloo-net = { workspace = true, default-features = true }
+dyn-clone = { workspace = true }
 
 [dependencies.web-sys]
 features = [

@@ -54,12 +54,8 @@ impl HashRouter {
             window().scroll_to_with_x_and_y(0.0, 0.0);
         }
     }
-}
 
-impl LocationProvider for HashRouter {
-    type Error = JsValue;
-
-    fn new() -> Result<Self, JsValue> {
+    pub fn new() -> Result<Self, JsValue> {
         let url = ArcRwSignal::new(Self::current()?);
         let path_stack = ArcStoredValue::new(
             Self::current().map(|n| vec![n]).unwrap_or_default(),
@@ -72,11 +68,7 @@ impl LocationProvider for HashRouter {
         })
     }
 
-    fn as_url(&self) -> &ArcRwSignal<Url> {
-        &self.url
-    }
-
-    fn current() -> Result<Url, Self::Error> {
+    fn current() -> Result<Url, JsValue> {
         let location = window().location();
         Ok(Url {
             origin: location.origin()?,
@@ -92,13 +84,19 @@ impl LocationProvider for HashRouter {
             hash: location.hash()?,
         })
     }
+}
 
-    fn parse(url: &str) -> Result<Url, Self::Error> {
-        let base = window().location().origin()?;
-        Self::parse_with_base(url, &base)
+impl LocationProvider for HashRouter {
+    fn as_url(&self) -> &ArcRwSignal<Url> {
+        &self.url
     }
 
-    fn parse_with_base(url: &str, base: &str) -> Result<Url, Self::Error> {
+    fn parse(&self, url: &str) -> Result<Url, JsValue> {
+        let base = window().location().origin()?;
+        self.parse_with_base(url, &base)
+    }
+
+    fn parse_with_base(&self, url: &str, base: &str) -> Result<Url, JsValue> {
         let location = web_sys::Url::new_with_base(url, base)?;
         Ok(Url {
             origin: location.origin(),
@@ -158,7 +156,7 @@ impl LocationProvider for HashRouter {
         };
 
         let handle_anchor_click =
-            handle_anchor_click(base, Self::parse_with_base, navigate);
+            handle_anchor_click(base, Box::new(self.clone()), navigate);
         let closure = Closure::wrap(Box::new(move |ev: Event| {
             if let Err(e) = handle_anchor_click(ev) {
                 #[cfg(feature = "tracing")]
@@ -248,7 +246,7 @@ impl LocationProvider for HashRouter {
         Self::scroll_to_el(loc.scroll);
     }
 
-    fn redirect(loc: &str) {
+    fn redirect(&self, loc: &str) {
         let navigate = use_navigate();
         let Some(url) = resolve_redirect_url(loc) else {
             return; // resolve_redirect_url() already logs an error

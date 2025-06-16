@@ -1,7 +1,6 @@
 use crate::{
-    components::ToHref,
+    components::{RouterContext, ToHref},
     hooks::{has_router, use_navigate, use_resolved_path},
-    location::{BrowserUrl, LocationProvider},
     NavigateOptions,
 };
 use leptos::{ev, html::form, logging::*, prelude::*, task::spawn_local};
@@ -100,8 +99,10 @@ where
     ) -> impl IntoView {
         let action_version = version;
         let navigate = has_router.then(use_navigate);
+        let cx = use_context::<RouterContext>().expect("no router");
         let on_submit = {
             move |ev: web_sys::SubmitEvent| {
+                let cx = cx.clone();
                 let navigate = navigate.clone();
                 if ev.default_prevented() {
                     return;
@@ -159,7 +160,12 @@ where
                                 // get returned from a server function
                                 if resp.redirected() {
                                     let resp_url = &resp.url();
-                                    match BrowserUrl::parse(resp_url.as_str()) {
+                                    match cx
+                                        .location_provider
+                                        .as_ref()
+                                        .unwrap()
+                                        .parse(resp_url.as_str())
+                                    {
                                         Ok(url) => {
                                             if url.origin()
                                                 != current_window_origin()
@@ -235,7 +241,12 @@ where
                                 // get returned from a server function
                                 if resp.redirected() {
                                     let resp_url = &resp.url();
-                                    match BrowserUrl::parse(resp_url.as_str()) {
+                                    match cx
+                                        .location_provider
+                                        .as_ref()
+                                        .unwrap()
+                                        .parse(resp_url.as_str())
+                                    {
                                         Ok(url) => {
                                             if url.origin()
                                                 != current_window_origin()

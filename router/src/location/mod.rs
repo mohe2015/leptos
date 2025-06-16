@@ -2,6 +2,7 @@
 
 use any_spawner::Executor;
 use core::fmt::Debug;
+use dyn_clone::DynClone;
 use js_sys::Reflect;
 use leptos::server::ServerActionError;
 use reactive_graph::{
@@ -213,14 +214,10 @@ impl Default for LocationChange {
     }
 }
 
-pub trait LocationProvider: Clone + 'static {
-    type Error: Debug;
+dyn_clone::clone_trait_object!(LocationProvider);
 
-    fn new() -> Result<Self, Self::Error>;
-
+pub trait LocationProvider: DynClone + 'static {
     fn as_url(&self) -> &ArcRwSignal<Url>;
-
-    fn current() -> Result<Url, Self::Error>;
 
     /// Sets up any global event listeners or other initialization needed.
     fn init(&self, base: Option<Cow<'static, str>>);
@@ -232,13 +229,13 @@ pub trait LocationProvider: Clone + 'static {
     /// Update the browser's history to reflect a new location.
     fn complete_navigation(&self, loc: &LocationChange);
 
-    fn parse(url: &str) -> Result<Url, Self::Error> {
-        Self::parse_with_base(url, BASE)
+    fn parse(&self, url: &str) -> Result<Url, JsValue> {
+        self.parse_with_base(url, BASE)
     }
 
-    fn parse_with_base(url: &str, base: &str) -> Result<Url, Self::Error>;
+    fn parse_with_base(&self, url: &str, base: &str) -> Result<Url, JsValue>;
 
-    fn redirect(loc: &str);
+    fn redirect(&self, loc: &str);
 
     /// Whether we are currently in a "back" navigation.
     fn is_back(&self) -> ReadSignal<bool>;
@@ -278,7 +275,7 @@ where
 
 pub(crate) fn handle_anchor_click<NavFn, NavFut>(
     router_base: Option<Cow<'static, str>>,
-    parse_with_base: fn(&str, &str) -> Result<Url, JsValue>,
+    location_provider: Box<dyn LocationProvider>,
     navigate: NavFn,
 ) -> Box<dyn Fn(Event) -> Result<(), JsValue>>
 where
@@ -329,7 +326,9 @@ where
                 return Ok(());
             }
 
-            let url = parse_with_base(href.as_str(), &origin).unwrap();
+            let url = location_provider
+                .parse_with_base(href.as_str(), &origin)
+                .unwrap();
             let path_name = Url::unescape_minimal(&url.path);
 
             // let browser handle this event if it leaves our domain

@@ -69,7 +69,7 @@ where
 
 impl<Loc, Defs, FalFn, Fal> Render for NestedRoutesView<Loc, Defs, FalFn>
 where
-    Loc: LocationProvider,
+    Loc: LocationProvider + Clone,
     Defs: MatchNestedRoutes,
     FalFn: FnOnce() -> Fal,
     Fal: Render + 'static,
@@ -228,7 +228,7 @@ where
 
 impl<Loc, Defs, Fal, FalFn> AddAnyAttr for NestedRoutesView<Loc, Defs, FalFn>
 where
-    Loc: LocationProvider + Send,
+    Loc: LocationProvider + Send + Clone,
     Defs: MatchNestedRoutes + Send + 'static,
     FalFn: FnOnce() -> Fal + Send + 'static,
     Fal: RenderHtml + 'static,
@@ -249,7 +249,7 @@ where
 
 impl<Loc, Defs, FalFn, Fal> RenderHtml for NestedRoutesView<Loc, Defs, FalFn>
 where
-    Loc: LocationProvider + Send,
+    Loc: LocationProvider + Send + Clone,
     Defs: MatchNestedRoutes + Send + 'static,
     FalFn: FnOnce() -> Fal + Send + 'static,
     Fal: RenderHtml + 'static,

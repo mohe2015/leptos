@@ -165,6 +165,7 @@ rustversion = { default-features = false, version = "1.0.21" }
 getrandom = { default-features = false, version = "0.3.3" }
 actix-files = { default-features = false, version = "0.6.6" }
 async-lock = { default-features = false, version = "3.4.0" }
+dyn-clone = { default-features = false, version = "1.0.19" }
 
 [profile.release]
 codegen-units = 1

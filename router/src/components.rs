@@ -29,6 +29,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use wasm_bindgen::JsValue;
 
 /// A wrapper that allows passing route definitions as children to a component like [`Routes`],
 /// [`FlatRoutes`], [`ParentRoute`], or [`ProtectedParentRoute`].
@@ -67,6 +68,9 @@ pub fn Router<Chil>(
     /// any elements, and should include a [`Routes`] component somewhere
     /// to define and display [`Route`]s.
     children: TypedChildren<Chil>,
+    /// The routing provider to use.
+    #[prop(default = BrowserUrl::new().map(|v| Box::new(v) as Box<dyn LocationProvider + Send>))]
+    location: Result<Box<dyn LocationProvider + Send>, JsValue>,
 ) -> impl IntoView
 where
     Chil: IntoView,
@@ -83,8 +87,7 @@ where
     #[cfg(not(feature = "ssr"))]
     let (location_provider, current_url, redirect_hook) = {
         let owner = Owner::current();
-        let location =
-            BrowserUrl::new().expect("could not access browser navigation"); // TODO options here
+        let location = location.unwrap();
         location.init(base.clone());
         provide_context(location.clone());
         let current_url = location.as_url().clone();
@@ -127,7 +130,7 @@ pub(crate) struct RouterContext {
     pub set_is_routing: Option<SignalSetter<bool>>,
     pub query_mutations:
         ArcStoredValue<Vec<(Oco<'static, str>, Option<String>)>>,
-    pub location_provider: Option<BrowserUrl>,
+    pub location_provider: Option<Box<dyn LocationProvider + Send + Sync>>,
 }
 
 impl RouterContext {
@@ -144,7 +147,12 @@ impl RouterContext {
             resolve_path("", path, None)
         };
 
-        let mut url = match BrowserUrl::parse(&resolved_to) {
+        let mut url = match self
+            .location_provider
+            .as_ref()
+            .unwrap()
+            .parse(&resolved_to)
+        {
             Ok(url) => url,
             Err(e) => {
                 leptos::logging::error!("Error parsing URL: {e:?}");
